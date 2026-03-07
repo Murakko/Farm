@@ -1,0 +1,601 @@
+-- =============================================
+-- AUTO FARM - FINAL VERSION
+-- Place as LocalScript in StarterPlayerScripts
+-- =============================================
+
+local player = game:GetService("Players").LocalPlayer
+local vim = game:GetService("VirtualInputManager")
+local teleportService = game:GetService("TeleportService")
+
+-- =============================================
+-- GUI
+-- =============================================
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "AutoFarm"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = player:WaitForChild("PlayerGui")
+
+local mainFrame = Instance.new("Frame")
+mainFrame.Size = UDim2.new(0, 280, 0, 140)
+mainFrame.Position = UDim2.new(0, 10, 0.5, -70)
+mainFrame.BackgroundColor3 = Color3.fromRGB(10, 10, 15)
+mainFrame.BackgroundTransparency = 0.1
+mainFrame.BorderSizePixel = 0
+mainFrame.Active = true
+mainFrame.Draggable = true
+mainFrame.Parent = screenGui
+
+local corner = Instance.new("UICorner")
+corner.CornerRadius = UDim.new(0, 10)
+corner.Parent = mainFrame
+
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, -10, 0, 25)
+title.Position = UDim2.new(0, 5, 0, 5)
+title.BackgroundTransparency = 1
+title.Text = "🚔 AUTO FARM"
+title.TextColor3 = Color3.fromRGB(255, 255, 255)
+title.TextSize = 14
+title.TextXAlignment = Enum.TextXAlignment.Left
+title.Font = Enum.Font.GothamBold
+title.Parent = mainFrame
+
+local exitStatus = Instance.new("TextLabel")
+exitStatus.Size = UDim2.new(1, -10, 0, 20)
+exitStatus.Position = UDim2.new(0, 5, 0, 35)
+exitStatus.BackgroundTransparency = 1
+exitStatus.Text = "🚶 Auto-Exit: Ready"
+exitStatus.TextColor3 = Color3.fromRGB(0, 255, 100)
+exitStatus.TextSize = 12
+exitStatus.TextXAlignment = Enum.TextXAlignment.Left
+exitStatus.Font = Enum.Font.Gotham
+exitStatus.Parent = mainFrame
+
+local airdropStatus = Instance.new("TextLabel")
+airdropStatus.Size = UDim2.new(1, -10, 0, 20)
+airdropStatus.Position = UDim2.new(0, 5, 0, 60)
+airdropStatus.BackgroundTransparency = 1
+airdropStatus.Text = "🪂 Airdrop: Scanning..."
+airdropStatus.TextColor3 = Color3.fromRGB(255, 255, 0)
+airdropStatus.TextSize = 12
+airdropStatus.TextXAlignment = Enum.TextXAlignment.Left
+airdropStatus.Font = Enum.Font.Gotham
+airdropStatus.Parent = mainFrame
+
+local npcStatus = Instance.new("TextLabel")
+npcStatus.Size = UDim2.new(1, -10, 0, 20)
+npcStatus.Position = UDim2.new(0, 5, 0, 85)
+npcStatus.BackgroundTransparency = 1
+npcStatus.Text = "🔫 NPC Killer: Active"
+npcStatus.TextColor3 = Color3.fromRGB(255, 100, 100)
+npcStatus.TextSize = 12
+npcStatus.TextXAlignment = Enum.TextXAlignment.Left
+npcStatus.Font = Enum.Font.Gotham
+npcStatus.Parent = mainFrame
+
+local coordsLabel = Instance.new("TextLabel")
+coordsLabel.Size = UDim2.new(1, -10, 0, 20)
+coordsLabel.Position = UDim2.new(0, 5, 0, 110)
+coordsLabel.BackgroundTransparency = 1
+coordsLabel.Text = "📍 0, 0, 0"
+coordsLabel.TextColor3 = Color3.fromRGB(150, 150, 255)
+coordsLabel.TextSize = 10
+coordsLabel.TextXAlignment = Enum.TextXAlignment.Left
+coordsLabel.Font = Enum.Font.Code
+coordsLabel.Parent = mainFrame
+
+-- =============================================
+-- VARIABLES
+-- =============================================
+local linearVelocity = nil
+local alignOrientation = nil
+local attachment = nil
+local collecting = false
+local flightSpeed = 180
+local currentAirdrop = nil
+local farmSession = 0
+local EXIT_SPEED = 80
+
+-- =============================================
+-- FLIGHT
+-- =============================================
+local function enableFlight()
+    if not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then return false end
+
+    local hrp = player.Character.HumanoidRootPart
+    local humanoid = player.Character:FindFirstChild("Humanoid")
+
+    if humanoid then
+        humanoid.PlatformStand = true
+        humanoid.WalkSpeed = 0
+        humanoid.JumpPower = 0
+        humanoid.AutoRotate = false
+    end
+
+    if linearVelocity then pcall(function() linearVelocity:Destroy() end) linearVelocity = nil end
+    if alignOrientation then pcall(function() alignOrientation:Destroy() end) alignOrientation = nil end
+    if attachment then pcall(function() attachment:Destroy() end) attachment = nil end
+
+    attachment = Instance.new("Attachment")
+    attachment.Parent = hrp
+
+    linearVelocity = Instance.new("LinearVelocity")
+    linearVelocity.Attachment0 = attachment
+    linearVelocity.MaxForce = 4000
+    linearVelocity.VelocityConstraintMode = Enum.VelocityConstraintMode.Vector
+    linearVelocity.VectorVelocity = Vector3.new(0, 0, 0)
+    linearVelocity.Parent = hrp
+
+    alignOrientation = Instance.new("AlignOrientation")
+    alignOrientation.Attachment0 = attachment
+    alignOrientation.MaxTorque = 4000
+    alignOrientation.MaxAngularVelocity = 100
+    alignOrientation.Responsiveness = 50
+    alignOrientation.CFrame = hrp.CFrame
+    alignOrientation.Parent = hrp
+
+    return true
+end
+
+local function disableFlight()
+    if linearVelocity then pcall(function() linearVelocity:Destroy() end) linearVelocity = nil end
+    if alignOrientation then pcall(function() alignOrientation:Destroy() end) alignOrientation = nil end
+    if attachment then pcall(function() attachment:Destroy() end) attachment = nil end
+
+    if player.Character and player.Character:FindFirstChild("Humanoid") then
+        local humanoid = player.Character.Humanoid
+        humanoid.PlatformStand = false
+        humanoid.WalkSpeed = 16
+        humanoid.JumpPower = 50
+        humanoid.AutoRotate = true
+    end
+end
+
+-- =============================================
+-- NPC KILLER
+-- =============================================
+local function killNPCsInDrop(airdrop)
+    if not airdrop then return 0 end
+    local killedCount = 0
+
+    local npcFolder = airdrop:FindFirstChild("NPCs")
+    if npcFolder then
+        for _, npc in ipairs(npcFolder:GetChildren()) do
+            if npc:IsA("Model") then
+                pcall(function() npc:Destroy() killedCount = killedCount + 1 end)
+            end
+        end
+    end
+
+    for _, child in ipairs(airdrop:GetChildren()) do
+        if child:IsA("Model") and (
+            child.Name:find("Bodyguard") or child.Name:find("Chaser") or
+            child.Name:find("Enforcer") or child.Name:find("Sniper") or
+            child.Name:find("Guard")
+        ) then
+            pcall(function() child:Destroy() killedCount = killedCount + 1 end)
+        end
+    end
+
+    return killedCount
+end
+
+local function startNPCKiller()
+    task.spawn(function()
+        while true do
+            if currentAirdrop and currentAirdrop.Parent then
+                local killed = killNPCsInDrop(currentAirdrop)
+                if killed > 0 then npcStatus.Text = "🔫 NPC Killer: Killed " .. killed end
+            end
+            task.wait(0.1)
+        end
+    end)
+end
+
+-- =============================================
+-- AIRDROP DETECTION
+-- =============================================
+local currentDropRef = workspace:FindFirstChild("Drop")
+
+workspace.ChildAdded:Connect(function(child)
+    if child.Name == "Drop" then
+        currentDropRef = child
+        print("🎯 Drop detected!")
+    end
+end)
+
+workspace.ChildRemoved:Connect(function(child)
+    if child.Name == "Drop" then
+        currentDropRef = nil
+        print("🗑️ Drop removed")
+    end
+end)
+
+local function findAirdrop()
+    return currentDropRef
+end
+
+-- =============================================
+-- MOVEMENT
+-- =============================================
+local function moveTo(x, y, z)
+    if not player.Character or not player.Character:FindFirstChild("Humanoid") then return false end
+    local humanoid = player.Character.Humanoid
+    local target = Vector3.new(x, y, z)
+    humanoid:MoveTo(target)
+    local startTime = tick()
+    while tick() - startTime < 8 do
+        task.wait(0.5)
+        if not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then return false end
+        if (player.Character.HumanoidRootPart.Position - target).Magnitude < 5 then return true end
+    end
+    return false
+end
+
+local function moveToFast(x, y, z)
+    if not player.Character or not player.Character:FindFirstChild("Humanoid") then return false end
+    local humanoid = player.Character.Humanoid
+    local target = Vector3.new(x, y, z)
+    humanoid.WalkSpeed = EXIT_SPEED
+    humanoid:MoveTo(target)
+    local startTime = tick()
+    while tick() - startTime < 6 do
+        task.wait(0.1)
+        if not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then
+            humanoid.WalkSpeed = 16
+            return false
+        end
+        if (player.Character.HumanoidRootPart.Position - target).Magnitude < 4 then
+            humanoid.WalkSpeed = 16
+            return true
+        end
+    end
+    humanoid.WalkSpeed = 16
+    return false
+end
+
+-- =============================================
+-- EXIT STATION
+-- =============================================
+local function exitStation()
+    task.wait(3)
+    if not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then return end
+
+    local pos = player.Character.HumanoidRootPart.Position
+    local threshold = 8
+
+    if (pos - Vector3.new(-1176.97668, 15.6500063, -1580.52368)).Magnitude < threshold or
+       (pos - Vector3.new(-1188.92676, 15.6500063, -1580.92371)).Magnitude < threshold or
+       (pos - Vector3.new(-1164.22668, 15.6500063, -1580.52368)).Magnitude < threshold then
+        moveToFast(-1172.60, 18.85, -1592.21)
+        task.wait(0.2)
+        moveToFast(-1172.08, 18.70, -1616.77)
+        return
+    end
+
+    if (pos - Vector3.new(-1263.19031, 15.3000565, -1547.64966)).Magnitude < threshold then
+        moveToFast(-1263.16, 18.70, -1545.10)
+        return
+    end
+
+    if (pos - Vector3.new(-1172.82678, 36.0500031, -1582.12366)).Magnitude < threshold then
+        moveToFast(-1158.93, 39.10, -1578.16)
+        task.wait(0.2)
+        moveToFast(-1157.69, 39.10, -1565.66)
+        task.wait(0.2)
+        moveToFast(-1126.55, 39.15, -1566.25)
+        return
+    end
+
+    if (pos - Vector3.new(-1145.22668, 15.6500072, -1571.82361)).Magnitude < threshold or
+       (pos - Vector3.new(-1120.32666, 15.6500063, -1585.22363)).Magnitude < threshold then
+        moveToFast(-1172.99, 18.85, -1584.14)
+        task.wait(0.2)
+        moveToFast(-1172.60, 18.85, -1592.21)
+        task.wait(0.2)
+        moveToFast(-1172.08, 18.70, -1616.77)
+        return
+    end
+
+    if (pos - Vector3.new(741.764648, 35.3023949, 1132.69543)).Magnitude < threshold then
+        moveToFast(737.44, 38.79, 1129.58)
+        task.wait(0.2)
+        moveToFast(726.17, 38.70, 1084.20)
+        return
+    end
+
+    if (pos - Vector3.new(1896.12378, 23.0382195, -841.442078)).Magnitude < threshold or
+       (pos - Vector3.new(1801.46631, 23.0382195, -942.035217)).Magnitude < threshold then
+        return
+    end
+
+    if (pos - Vector3.new(765.782471, 17.1667881, -3345.54126)).Magnitude < threshold then
+        moveToFast(764.86, 19.86, -3342.63)
+        task.wait(0.2)
+        moveToFast(776.93, 19.88, -3338.16)
+        task.wait(0.2)
+        moveToFast(780.80, 19.88, -3348.12)
+        task.wait(0.2)
+        moveToFast(803.86, 19.70, -3338.15)
+        return
+    end
+end
+
+-- =============================================
+-- FLY TO AIRDROP
+-- =============================================
+local function flyToAirdrop(airdrop, session)
+    if not airdrop then return false end
+    if not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then return false end
+
+    currentAirdrop = airdrop
+
+    local targetPart = nil
+    for _, child in ipairs(airdrop:GetChildren()) do
+        if child:IsA("Part") then targetPart = child break end
+    end
+
+    if not targetPart then return false end
+
+    local hrp = player.Character.HumanoidRootPart
+    local myPos = hrp.Position
+    local targetPos = targetPart.Position
+
+    enableFlight()
+    killNPCsInDrop(airdrop)
+
+    local startTime = tick()
+    while hrp.Position.Y < myPos.Y + 380 and tick() - startTime < 20 do
+        if farmSession ~= session then disableFlight() return false end
+        if not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then disableFlight() return false end
+        linearVelocity.VectorVelocity = Vector3.new(0, flightSpeed * 0.8, 0)
+        alignOrientation.CFrame = CFrame.lookAt(hrp.Position, hrp.Position + Vector3.new(0, 1, 0))
+        task.wait(0.1)
+        killNPCsInDrop(airdrop)
+    end
+
+    startTime = tick()
+    local arrived = false
+    while tick() - startTime < 60 do
+        if farmSession ~= session then disableFlight() return false end
+        if not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then disableFlight() return false end
+        if targetPart and targetPart.Parent then targetPos = targetPart.Position end
+        local hDist = (Vector3.new(hrp.Position.X, 0, hrp.Position.Z) - Vector3.new(targetPos.X, 0, targetPos.Z)).Magnitude
+        if hDist <= 20 then arrived = true break end
+        local dir = (Vector3.new(targetPos.X, 0, targetPos.Z) - Vector3.new(hrp.Position.X, 0, hrp.Position.Z)).Unit
+        linearVelocity.VectorVelocity = dir * flightSpeed
+        alignOrientation.CFrame = CFrame.lookAt(hrp.Position, hrp.Position + dir)
+        task.wait(0.1)
+        killNPCsInDrop(airdrop)
+    end
+
+    if not arrived then disableFlight() return false end
+
+    local landPos = targetPos + Vector3.new(0, 3, 0)
+    startTime = tick()
+    while (hrp.Position - landPos).Magnitude > 3 and tick() - startTime < 10 do
+        if farmSession ~= session then disableFlight() return false end
+        if not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then disableFlight() return false end
+        local dir = (landPos - hrp.Position).Unit
+        linearVelocity.VectorVelocity = dir * (flightSpeed * 0.4)
+        alignOrientation.CFrame = CFrame.lookAt(hrp.Position, hrp.Position + dir)
+        task.wait(0.1)
+        killNPCsInDrop(airdrop)
+    end
+
+    if farmSession ~= session then disableFlight() return false end
+
+    linearVelocity.VectorVelocity = Vector3.new(0, 0, 0)
+    task.wait(0.1)
+
+    if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+        player.Character.HumanoidRootPart.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+        player.Character.HumanoidRootPart.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
+    end
+
+    if player.Character and player.Character:FindFirstChild("Humanoid") then
+        player.Character.Humanoid.Health = player.Character.Humanoid.MaxHealth
+    end
+
+    disableFlight()
+    print("✅ Landed on airdrop!")
+    return true
+end
+
+-- =============================================
+-- COLLECT AIRDROP
+-- =============================================
+local function collectAirdrop(airdrop, session)
+    if collecting then return false end
+    collecting = true
+
+    local targetPart = nil
+    for _, child in ipairs(airdrop:GetChildren()) do
+        if child:IsA("Part") then targetPart = child break end
+    end
+
+    if not targetPart then collecting = false return false end
+
+    vim:SendKeyEvent(true, Enum.KeyCode.E, false, nil)
+
+    local maxWait = 60
+    local elapsed = 0
+    while elapsed < maxWait do
+        task.wait(0.5)
+        elapsed = elapsed + 0.5
+
+        if farmSession ~= session then
+            vim:SendKeyEvent(false, Enum.KeyCode.E, false, nil)
+            collecting = false
+            return false
+        end
+
+        airdropStatus.Text = "🪂 Collecting... " .. math.floor(elapsed) .. "/" .. maxWait
+
+        local killed = killNPCsInDrop(airdrop)
+        if killed > 0 then npcStatus.Text = "🔫 NPC Killer: Killed " .. killed end
+
+        if not airdrop or not airdrop.Parent then
+            vim:SendKeyEvent(false, Enum.KeyCode.E, false, nil)
+            collecting = false
+            currentAirdrop = nil
+            return true
+        end
+
+        if player.Character and player.Character:FindFirstChild("Humanoid") and targetPart and targetPart.Parent then
+            local hrp = player.Character:FindFirstChild("HumanoidRootPart")
+            if hrp and (hrp.Position - targetPart.Position).Magnitude > 6 then
+                player.Character.Humanoid:MoveTo(targetPart.Position)
+            end
+        end
+    end
+
+    vim:SendKeyEvent(false, Enum.KeyCode.E, false, nil)
+
+    if not airdrop or not airdrop.Parent then
+        collecting = false
+        currentAirdrop = nil
+        return true
+    end
+
+    collecting = false
+    return false
+end
+
+-- =============================================
+-- SERVER HOP
+-- =============================================
+local function serverHop()
+    print("🔀 Server hopping...")
+    airdropStatus.Text = "🔀 Server hopping..."
+    airdropStatus.TextColor3 = Color3.fromRGB(255, 165, 0)
+
+    local success, err = pcall(function()
+        teleportService:Teleport(game.PlaceId, player)
+    end)
+
+    if not success then
+        print("❌ Server hop failed: " .. tostring(err))
+        airdropStatus.Text = "❌ Hop failed"
+        airdropStatus.TextColor3 = Color3.fromRGB(255, 0, 0)
+    end
+end
+
+-- =============================================
+-- AUTO POLICE SELECT
+-- =============================================
+task.spawn(function()
+    task.wait(3)
+    local btn = player:FindFirstChild("PlayerGui") and
+                player.PlayerGui:FindFirstChild("TeamSelectGui") and
+                player.PlayerGui.TeamSelectGui:FindFirstChild("PoliceTeam", true)
+    if btn then
+        local pos, size = btn.AbsolutePosition, btn.AbsoluteSize
+        vim:SendMouseButtonEvent(pos.X + size.X/2, pos.Y + size.Y/2, 0, true, nil, 0)
+        task.wait(0.1)
+        vim:SendMouseButtonEvent(pos.X + size.X/2, pos.Y + size.Y/2, 0, false, nil, 0)
+        print("✅ Police selected")
+    end
+end)
+
+-- =============================================
+-- FARM LOOP
+-- =============================================
+local function farmAirdrops()
+    local session = farmSession
+    print("🪂 Farm started! Session: " .. session)
+    local noAirdropTimer = 0
+
+    while farmSession == session do
+        if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+            local pos = player.Character.HumanoidRootPart.Position
+            coordsLabel.Text = string.format("📍 %.0f, %.0f, %.0f", pos.X, pos.Y, pos.Z)
+        end
+
+        local airdrop = findAirdrop()
+
+        if airdrop and not collecting then
+            noAirdropTimer = 0
+            airdropStatus.Text = "✅ Airdrop found!"
+            airdropStatus.TextColor3 = Color3.fromRGB(0, 255, 0)
+
+            local killed = killNPCsInDrop(airdrop)
+            if killed > 0 then npcStatus.Text = "🔫 NPC Killer: Killed " .. killed end
+
+            if flyToAirdrop(airdrop, session) then
+                if farmSession ~= session then break end
+                airdropStatus.Text = "🪂 Collecting..."
+                airdropStatus.TextColor3 = Color3.fromRGB(255, 255, 0)
+
+                if collectAirdrop(airdrop, session) then
+                    if farmSession ~= session then break end
+                    airdropStatus.Text = "💰 Collected! Hopping..."
+                    airdropStatus.TextColor3 = Color3.fromRGB(0, 255, 100)
+                    task.wait(1)
+                    serverHop()
+                    return
+                else
+                    if farmSession ~= session then break end
+                    airdropStatus.Text = "❌ Collection failed"
+                    airdropStatus.TextColor3 = Color3.fromRGB(255, 0, 0)
+                    task.wait(5)
+                end
+            else
+                if farmSession ~= session then break end
+                airdropStatus.Text = "❌ Failed to reach"
+                airdropStatus.TextColor3 = Color3.fromRGB(255, 0, 0)
+                disableFlight()
+                task.wait(5)
+            end
+
+            airdropStatus.Text = "🪂 Scanning..."
+            airdropStatus.TextColor3 = Color3.fromRGB(255, 255, 0)
+            currentAirdrop = nil
+        else
+            noAirdropTimer = noAirdropTimer + 1
+            airdropStatus.Text = "🪂 Scanning... " .. noAirdropTimer .. "s"
+            if noAirdropTimer >= 8 then
+                noAirdropTimer = 0
+                serverHop()
+                return
+            end
+            task.wait(1)
+        end
+    end
+
+    print("🛑 Farm loop ended (session " .. session .. " expired)")
+end
+
+-- =============================================
+-- RESPAWN HANDLER
+-- =============================================
+player.CharacterAdded:Connect(function()
+    print("💀 Respawned!")
+    farmSession = farmSession + 1
+    disableFlight()
+    collecting = false
+    currentAirdrop = nil
+
+    task.wait(2)
+    exitStatus.Text = "🚶 Auto-Exit: Running..."
+    exitStation()
+    exitStatus.Text = "🚶 Auto-Exit: Complete"
+
+    task.wait(1)
+    task.spawn(farmAirdrops)
+end)
+
+-- =============================================
+-- START
+-- =============================================
+task.spawn(function()
+    task.wait(3)
+    exitStatus.Text = "🚶 Auto-Exit: Running..."
+    exitStation()
+    exitStatus.Text = "🚶 Auto-Exit: Complete"
+    startNPCKiller()
+    task.wait(2)
+    farmAirdrops()
+end)
+
+print("✅ AUTO FARM LOADED!")
