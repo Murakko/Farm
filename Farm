@@ -9,15 +9,20 @@ local WS_URL = "wss://auto-farm--insanetothink.replit.app"
 if not _G.AutoFarmLoaded then
     _G.AutoFarmLoaded = true
     local socket = WebSocket.connect(WS_URL)
+    wsSocket = socket
     socket.OnMessage:Connect(function(msg)
         print("🔄 Received script from WebSocket!")
+        _G.AutoFarmLoaded = true
         loadstring(msg)()
     end)
     socket.OnClose:Connect(function()
-        print("🔌 WebSocket closed")
+        print("🔌 WebSocket closed - will reconnect on next server")
         _G.AutoFarmLoaded = nil
+        wsSocket = nil
     end)
     print("✅ WebSocket connected!")
+else
+    print("✅ Running from WebSocket - skipping WS setup")
 end
 
 local player = game:GetService("Players").LocalPlayer
@@ -445,17 +450,14 @@ end
 -- =============================================
 -- SERVER HOP
 -- =============================================
+local wsSocket = nil -- store socket reference globally
+
 local function serverHop()
     if isHopping then return end
     isHopping = true
     print("🔀 Server hopping...")
     airdropStatus.Text = "🔀 Server hopping..."
     airdropStatus.TextColor3 = Color3.fromRGB(255, 165, 0)
-
-    -- Set flag in getgenv so it persists after teleport
-    local env = getgenv and getgenv() or _G
-    env.AutoFarmLoaded = nil
-    env.AutoFarmHopped = true
 
     local success, err = pcall(function()
         teleportService:Teleport(game.PlaceId, player, {autoFarm = true})
@@ -466,19 +468,6 @@ local function serverHop()
         airdropStatus.Text = "❌ Hop failed"
         airdropStatus.TextColor3 = Color3.fromRGB(255, 0, 0)
         isHopping = false
-        env.AutoFarmLoaded = true
-        env.AutoFarmHopped = nil
-        return
-    end
-
-    -- Wait for new server then reload from GitHub
-    task.wait(6)
-    print("🔄 Reloading from GitHub...")
-    local ok, src = pcall(function() return game:HttpGet(GITHUB_URL) end)
-    if ok and src then
-        loadstring(src)()
-    else
-        warn("❌ Failed to reload: " .. tostring(src))
     end
 end
 
