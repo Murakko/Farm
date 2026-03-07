@@ -2,14 +2,21 @@
 -- AUTO FARM - SELF RELOADING VERSION
 -- =============================================
 
--- Persist across teleports (Xeno/executor specific)
-if syn and syn.protect_gui then
+-- Inject into Xeno's CoreGui folder to survive teleports
+local CoreGui = game:GetService("CoreGui")
+local XenoFolder = CoreGui:FindFirstChild("12344")
+if XenoFolder and not XenoFolder:FindFirstChild("AutoFarm") then
+    local s = Instance.new("LocalScript")
+    s.Name = "AutoFarm"
+    s.Source = game:HttpGet("https://raw.githubusercontent.com/Murakko/Farm/refs/heads/main/Farm")
+    s.Parent = XenoFolder
+    s.Disabled = false
+    print("✅ Injected into Xeno folder - will survive teleports!")
+elseif syn and syn.protect_gui then
     syn.protect_gui(script)
-    script.Parent = game:GetService("CoreGui")
+    script.Parent = CoreGui
 elseif gethui then
     script.Parent = gethui()
-elseif cloneref then
-    script.Parent = cloneref(game:GetService("CoreGui"))
 end
 
 local player = game:GetService("Players").LocalPlayer
