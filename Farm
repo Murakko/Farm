@@ -1,15 +1,123 @@
--- =============================================
--- AUTO FARM - FINAL VERSION
--- Place as LocalScript in StarterPlayerScripts
--- =============================================
+-- ============================================================
+-- AUTO FARM - COMPLETE LOADER WITH GITHUB SUPPORT
+-- ============================================================
+
+local player = game:GetService("Players").LocalPlayer
+local teleportService = game:GetService("TeleportService")
+
+-- ============================================================
+-- CONFIGURATION - REPLACE THIS WITH YOUR GITHUB RAW URL
+-- ============================================================
+local GITHUB_URL = "https://raw.githubusercontent.com/YOUR_USERNAME/YOUR_REPO/main/YOUR_FILE.lua"
+
+-- ============================================================
+-- TELEPORT DETECTION (RUNS FIRST)
+-- ============================================================
+local function checkForTeleport()
+    local success, data = pcall(function()
+        return teleportService:GetLocalPlayerTeleportData()
+    end)
+    
+    if success and data and data.script then
+        print("✅ Teleport detected! Reloading script...")
+        task.wait(2)
+        loadstring(data.script)()
+        return true
+    end
+    return false
+end
+
+if checkForTeleport() then 
+    print("🔄 Script reloaded after teleport!")
+    return 
+end
+
+-- ============================================================
+-- FETCH SCRIPT FROM GITHUB
+-- ============================================================
+local function fetchScript()
+    local success, result = pcall(function()
+        print("🌐 Fetching script from GitHub...")
+        return game:HttpGet(GITHUB_URL)
+    end)
+    
+    if success and result then
+        print("✅ Script fetched successfully!")
+        return result
+    else
+        print("❌ Failed to fetch script from GitHub")
+        return nil
+    end
+end
+
+-- ============================================================
+-- SERVER HOP FUNCTION (for the loaded script)
+-- ============================================================
+local function serverHop(scriptSource)
+    print("🔀 Server hopping with auto-reload...")
+    pcall(function()
+        teleportService:Teleport(
+            game.PlaceId,
+            player,
+            nil,
+            {script = scriptSource}
+        )
+    end)
+end
+
+-- ============================================================
+-- FETCH AND LOAD THE SCRIPT
+-- ============================================================
+local scriptContent = fetchScript()
+
+if scriptContent then
+    -- Add the serverHop function to the script
+    local serverHopCode = string.format([[
+-- Server hop function added by loader
+_G.serverHop = function()
+    local teleportService = game:GetService("TeleportService")
+    local player = game:GetService("Players").LocalPlayer
+    pcall(function()
+        teleportService:Teleport(%q, player, nil, {script = %q})
+    end)
+end
+]], game.PlaceId, scriptContent)
+    
+    -- Combine and load
+    local fullScript = scriptContent .. "\n\n" .. serverHopCode
+    
+    local success, loaded = pcall(loadstring, fullScript)
+    if success and loaded then
+        print("✅ Farm script loaded successfully from GitHub!")
+        loaded()
+    else
+        print("❌ Error loading script: " .. tostring(loaded))
+        -- Fallback: try to run just the server hop
+        print("⚠️ Using fallback mode...")
+    end
+else
+    print("❌ Could not load script. Check your GitHub URL!")
+end
+
+-- ============================================================
+-- YOUR MAIN SCRIPT TO UPLOAD TO GITHUB
+-- ============================================================
+--[[
+Copy EVERYTHING below this line and upload it to GitHub as your file
+
+-- ============================================================
+-- AUTO FARM - MAIN SCRIPT (Upload this to GitHub)
+-- ============================================================
 
 local player = game:GetService("Players").LocalPlayer
 local vim = game:GetService("VirtualInputManager")
+local runService = game:GetService("RunService")
+local userInputService = game:GetService("UserInputService")
 local teleportService = game:GetService("TeleportService")
 
--- =============================================
+-- ============================================================
 -- GUI
--- =============================================
+-- ============================================================
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "AutoFarm"
 screenGui.ResetOnSpawn = false
@@ -33,7 +141,7 @@ local title = Instance.new("TextLabel")
 title.Size = UDim2.new(1, -10, 0, 25)
 title.Position = UDim2.new(0, 5, 0, 5)
 title.BackgroundTransparency = 1
-title.Text = "🚔 AUTO FARM"
+title.Text = "🚔 AUTO FARM - GITHUB"
 title.TextColor3 = Color3.fromRGB(255, 255, 255)
 title.TextSize = 14
 title.TextXAlignment = Enum.TextXAlignment.Left
@@ -84,9 +192,9 @@ coordsLabel.TextXAlignment = Enum.TextXAlignment.Left
 coordsLabel.Font = Enum.Font.Code
 coordsLabel.Parent = mainFrame
 
--- =============================================
--- VARIABLES
--- =============================================
+-- ============================================================
+-- FLIGHT VARIABLES
+-- ============================================================
 local linearVelocity = nil
 local alignOrientation = nil
 local attachment = nil
@@ -94,13 +202,12 @@ local collecting = false
 local flightSpeed = 180
 local currentAirdrop = nil
 local farmSession = 0
-local EXIT_SPEED = 80
 
--- =============================================
--- FLIGHT
--- =============================================
+-- === ENABLE FLIGHT ===
 local function enableFlight()
-    if not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then return false end
+    if not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then
+        return false
+    end
 
     local hrp = player.Character.HumanoidRootPart
     local humanoid = player.Character:FindFirstChild("Humanoid")
@@ -137,6 +244,7 @@ local function enableFlight()
     return true
 end
 
+-- === DISABLE FLIGHT ===
 local function disableFlight()
     if linearVelocity then pcall(function() linearVelocity:Destroy() end) linearVelocity = nil end
     if alignOrientation then pcall(function() alignOrientation:Destroy() end) alignOrientation = nil end
@@ -151,51 +259,46 @@ local function disableFlight()
     end
 end
 
--- =============================================
--- NPC KILLER
--- =============================================
+-- === NPC KILLER ===
 local function killNPCsInDrop(airdrop)
     if not airdrop then return 0 end
+
     local killedCount = 0
 
     local npcFolder = airdrop:FindFirstChild("NPCs")
     if npcFolder then
         for _, npc in ipairs(npcFolder:GetChildren()) do
             if npc:IsA("Model") then
-                pcall(function() npc:Destroy() killedCount = killedCount + 1 end)
+                pcall(function()
+                    npc:Destroy()
+                    killedCount = killedCount + 1
+                end)
             end
         end
     end
 
     for _, child in ipairs(airdrop:GetChildren()) do
         if child:IsA("Model") and (
-            child.Name:find("Bodyguard") or child.Name:find("Chaser") or
-            child.Name:find("Enforcer") or child.Name:find("Sniper") or
+            child.Name:find("Bodyguard") or
+            child.Name:find("Chaser") or
+            child.Name:find("Enforcer") or
+            child.Name:find("Sniper") or
             child.Name:find("Guard")
         ) then
-            pcall(function() child:Destroy() killedCount = killedCount + 1 end)
+            pcall(function()
+                child:Destroy()
+                killedCount = killedCount + 1
+            end)
         end
     end
 
     return killedCount
 end
 
-local function startNPCKiller()
-    task.spawn(function()
-        while true do
-            if currentAirdrop and currentAirdrop.Parent then
-                local killed = killNPCsInDrop(currentAirdrop)
-                if killed > 0 then npcStatus.Text = "🔫 NPC Killer: Killed " .. killed end
-            end
-            task.wait(0.1)
-        end
-    end)
-end
+-- === AIRDROP DETECTION ===
+local currentDropRef = nil
 
--- =============================================
--- AIRDROP DETECTION
--- =============================================
-local currentDropRef = workspace:FindFirstChild("Drop")
+currentDropRef = workspace:FindFirstChild("Drop")
 
 workspace.ChildAdded:Connect(function(child)
     if child.Name == "Drop" then
@@ -215,29 +318,20 @@ local function findAirdrop()
     return currentDropRef
 end
 
--- =============================================
--- MOVEMENT
--- =============================================
-local function moveTo(x, y, z)
-    if not player.Character or not player.Character:FindFirstChild("Humanoid") then return false end
-    local humanoid = player.Character.Humanoid
-    local target = Vector3.new(x, y, z)
-    humanoid:MoveTo(target)
-    local startTime = tick()
-    while tick() - startTime < 8 do
-        task.wait(0.5)
-        if not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then return false end
-        if (player.Character.HumanoidRootPart.Position - target).Magnitude < 5 then return true end
-    end
-    return false
-end
+-- === MOVE FUNCTION ===
+local EXIT_SPEED = 80
 
 local function moveToFast(x, y, z)
-    if not player.Character or not player.Character:FindFirstChild("Humanoid") then return false end
+    if not player.Character or not player.Character:FindFirstChild("Humanoid") then
+        return false
+    end
+
     local humanoid = player.Character.Humanoid
     local target = Vector3.new(x, y, z)
+
     humanoid.WalkSpeed = EXIT_SPEED
     humanoid:MoveTo(target)
+
     local startTime = tick()
     while tick() - startTime < 6 do
         task.wait(0.1)
@@ -245,40 +339,49 @@ local function moveToFast(x, y, z)
             humanoid.WalkSpeed = 16
             return false
         end
-        if (player.Character.HumanoidRootPart.Position - target).Magnitude < 4 then
+        local dist = (player.Character.HumanoidRootPart.Position - target).Magnitude
+        if dist < 4 then
             humanoid.WalkSpeed = 16
             return true
         end
     end
+
     humanoid.WalkSpeed = 16
     return false
 end
 
--- =============================================
--- EXIT STATION
--- =============================================
+-- === AUTO EXIT STATION ===
 local function exitStation()
     task.wait(3)
-    if not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then return end
+    if not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then
+        return
+    end
 
-    local pos = player.Character.HumanoidRootPart.Position
+    local hrp = player.Character.HumanoidRootPart
+    local pos = hrp.Position
     local threshold = 8
 
+    -- BIG STATION - Main Spawns
     if (pos - Vector3.new(-1176.97668, 15.6500063, -1580.52368)).Magnitude < threshold or
        (pos - Vector3.new(-1188.92676, 15.6500063, -1580.92371)).Magnitude < threshold or
        (pos - Vector3.new(-1164.22668, 15.6500063, -1580.52368)).Magnitude < threshold then
+        print("✅ Big Station - Main")
         moveToFast(-1172.60, 18.85, -1592.21)
         task.wait(0.2)
         moveToFast(-1172.08, 18.70, -1616.77)
         return
     end
 
+    -- BIG STATION - Side Room
     if (pos - Vector3.new(-1263.19031, 15.3000565, -1547.64966)).Magnitude < threshold then
+        print("✅ Big Station - Side Room")
         moveToFast(-1263.16, 18.70, -1545.10)
         return
     end
 
+    -- BIG STATION - Upstairs
     if (pos - Vector3.new(-1172.82678, 36.0500031, -1582.12366)).Magnitude < threshold then
+        print("✅ Big Station - Upstairs")
         moveToFast(-1158.93, 39.10, -1578.16)
         task.wait(0.2)
         moveToFast(-1157.69, 39.10, -1565.66)
@@ -287,8 +390,10 @@ local function exitStation()
         return
     end
 
+    -- BIG STATION - Side Spawns
     if (pos - Vector3.new(-1145.22668, 15.6500072, -1571.82361)).Magnitude < threshold or
        (pos - Vector3.new(-1120.32666, 15.6500063, -1585.22363)).Magnitude < threshold then
+        print("✅ Big Station - Side")
         moveToFast(-1172.99, 18.85, -1584.14)
         task.wait(0.2)
         moveToFast(-1172.60, 18.85, -1592.21)
@@ -297,19 +402,25 @@ local function exitStation()
         return
     end
 
+    -- SMALL STATION 1 (BRIDGE)
     if (pos - Vector3.new(741.764648, 35.3023949, 1132.69543)).Magnitude < threshold then
+        print("✅ Bridge Station")
         moveToFast(737.44, 38.79, 1129.58)
         task.wait(0.2)
         moveToFast(726.17, 38.70, 1084.20)
         return
     end
 
+    -- MILITARY BASE
     if (pos - Vector3.new(1896.12378, 23.0382195, -841.442078)).Magnitude < threshold or
        (pos - Vector3.new(1801.46631, 23.0382195, -942.035217)).Magnitude < threshold then
+        print("✅ Military Base")
         return
     end
 
+    -- SMALL STATION 2 (DESERT)
     if (pos - Vector3.new(765.782471, 17.1667881, -3345.54126)).Magnitude < threshold then
+        print("✅ Desert Station")
         moveToFast(764.86, 19.86, -3342.63)
         task.wait(0.2)
         moveToFast(776.93, 19.88, -3338.16)
@@ -321,9 +432,22 @@ local function exitStation()
     end
 end
 
--- =============================================
--- FLY TO AIRDROP
--- =============================================
+-- === NPC KILLER LOOP ===
+local function startNPCKiller()
+    task.spawn(function()
+        while true do
+            if currentAirdrop and currentAirdrop.Parent then
+                local killed = killNPCsInDrop(currentAirdrop)
+                if killed > 0 then
+                    npcStatus.Text = "🔫 NPC Killer: Killed " .. killed
+                end
+            end
+            task.wait(0.1)
+        end
+    end)
+end
+
+-- === FLY TO AIRDROP ===
 local function flyToAirdrop(airdrop, session)
     if not airdrop then return false end
     if not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then return false end
@@ -332,7 +456,10 @@ local function flyToAirdrop(airdrop, session)
 
     local targetPart = nil
     for _, child in ipairs(airdrop:GetChildren()) do
-        if child:IsA("Part") then targetPart = child break end
+        if child:IsA("Part") then
+            targetPart = child
+            break
+        end
     end
 
     if not targetPart then return false end
@@ -344,24 +471,30 @@ local function flyToAirdrop(airdrop, session)
     enableFlight()
     killNPCsInDrop(airdrop)
 
+    -- STEP 1: Gain altitude
+    print("⬆️ Gaining altitude...")
     local startTime = tick()
     while hrp.Position.Y < myPos.Y + 380 and tick() - startTime < 20 do
         if farmSession ~= session then disableFlight() return false end
-        if not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then disableFlight() return false end
         linearVelocity.VectorVelocity = Vector3.new(0, flightSpeed * 0.8, 0)
         alignOrientation.CFrame = CFrame.lookAt(hrp.Position, hrp.Position + Vector3.new(0, 1, 0))
         task.wait(0.1)
         killNPCsInDrop(airdrop)
     end
 
+    -- STEP 2: Fly horizontally
+    print("➡️ Flying to airdrop...")
     startTime = tick()
-    local arrived = false
     while tick() - startTime < 60 do
         if farmSession ~= session then disableFlight() return false end
-        if not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then disableFlight() return false end
-        if targetPart and targetPart.Parent then targetPos = targetPart.Position end
+
+        if targetPart and targetPart.Parent then
+            targetPos = targetPart.Position
+        end
+
         local hDist = (Vector3.new(hrp.Position.X, 0, hrp.Position.Z) - Vector3.new(targetPos.X, 0, targetPos.Z)).Magnitude
-        if hDist <= 20 then arrived = true break end
+        if hDist <= 20 then break end
+
         local dir = (Vector3.new(targetPos.X, 0, targetPos.Z) - Vector3.new(hrp.Position.X, 0, hrp.Position.Z)).Unit
         linearVelocity.VectorVelocity = dir * flightSpeed
         alignOrientation.CFrame = CFrame.lookAt(hrp.Position, hrp.Position + dir)
@@ -369,13 +502,12 @@ local function flyToAirdrop(airdrop, session)
         killNPCsInDrop(airdrop)
     end
 
-    if not arrived then disableFlight() return false end
-
+    -- STEP 3: Descend
+    print("⬇️ Descending...")
     local landPos = targetPos + Vector3.new(0, 3, 0)
     startTime = tick()
     while (hrp.Position - landPos).Magnitude > 3 and tick() - startTime < 10 do
         if farmSession ~= session then disableFlight() return false end
-        if not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then disableFlight() return false end
         local dir = (landPos - hrp.Position).Unit
         linearVelocity.VectorVelocity = dir * (flightSpeed * 0.4)
         alignOrientation.CFrame = CFrame.lookAt(hrp.Position, hrp.Position + dir)
@@ -383,39 +515,36 @@ local function flyToAirdrop(airdrop, session)
         killNPCsInDrop(airdrop)
     end
 
-    if farmSession ~= session then disableFlight() return false end
-
     linearVelocity.VectorVelocity = Vector3.new(0, 0, 0)
     task.wait(0.1)
 
     if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-        player.Character.HumanoidRootPart.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
-        player.Character.HumanoidRootPart.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
-    end
-
-    if player.Character and player.Character:FindFirstChild("Humanoid") then
-        player.Character.Humanoid.Health = player.Character.Humanoid.MaxHealth
+        local hrp = player.Character.HumanoidRootPart
+        hrp.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+        hrp.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
     end
 
     disableFlight()
-    print("✅ Landed on airdrop!")
+    print("✅ Landed!")
     return true
 end
 
--- =============================================
--- COLLECT AIRDROP
--- =============================================
+-- === COLLECT AIRDROP ===
 local function collectAirdrop(airdrop, session)
     if collecting then return false end
     collecting = true
 
     local targetPart = nil
     for _, child in ipairs(airdrop:GetChildren()) do
-        if child:IsA("Part") then targetPart = child break end
+        if child:IsA("Part") then
+            targetPart = child
+            break
+        end
     end
 
     if not targetPart then collecting = false return false end
 
+    disableFlight()
     vim:SendKeyEvent(true, Enum.KeyCode.E, false, nil)
 
     local maxWait = 60
@@ -441,49 +570,14 @@ local function collectAirdrop(airdrop, session)
             currentAirdrop = nil
             return true
         end
-
-        if player.Character and player.Character:FindFirstChild("Humanoid") and targetPart and targetPart.Parent then
-            local hrp = player.Character:FindFirstChild("HumanoidRootPart")
-            if hrp and (hrp.Position - targetPart.Position).Magnitude > 6 then
-                player.Character.Humanoid:MoveTo(targetPart.Position)
-            end
-        end
     end
 
     vim:SendKeyEvent(false, Enum.KeyCode.E, false, nil)
-
-    if not airdrop or not airdrop.Parent then
-        collecting = false
-        currentAirdrop = nil
-        return true
-    end
-
     collecting = false
     return false
 end
 
--- =============================================
--- SERVER HOP
--- =============================================
-local function serverHop()
-    print("🔀 Server hopping...")
-    airdropStatus.Text = "🔀 Server hopping..."
-    airdropStatus.TextColor3 = Color3.fromRGB(255, 165, 0)
-
-    local success, err = pcall(function()
-        teleportService:Teleport(game.PlaceId, player)
-    end)
-
-    if not success then
-        print("❌ Server hop failed: " .. tostring(err))
-        airdropStatus.Text = "❌ Hop failed"
-        airdropStatus.TextColor3 = Color3.fromRGB(255, 0, 0)
-    end
-end
-
--- =============================================
--- AUTO POLICE SELECT
--- =============================================
+-- === AUTO POLICE SELECT ===
 task.spawn(function()
     task.wait(3)
     local btn = player:FindFirstChild("PlayerGui") and
@@ -494,16 +588,14 @@ task.spawn(function()
         vim:SendMouseButtonEvent(pos.X + size.X/2, pos.Y + size.Y/2, 0, true, nil, 0)
         task.wait(0.1)
         vim:SendMouseButtonEvent(pos.X + size.X/2, pos.Y + size.Y/2, 0, false, nil, 0)
-        print("✅ Police selected")
     end
 end)
 
--- =============================================
--- FARM LOOP
--- =============================================
+-- === MAIN FARM LOOP ===
 local function farmAirdrops()
     local session = farmSession
-    print("🪂 Farm started! Session: " .. session)
+    print("🪂 Farming started! Session: " .. session)
+
     local noAirdropTimer = 0
 
     while farmSession == session do
@@ -519,31 +611,29 @@ local function farmAirdrops()
             airdropStatus.Text = "✅ Airdrop found!"
             airdropStatus.TextColor3 = Color3.fromRGB(0, 255, 0)
 
-            local killed = killNPCsInDrop(airdrop)
-            if killed > 0 then npcStatus.Text = "🔫 NPC Killer: Killed " .. killed end
+            killNPCsInDrop(airdrop)
 
             if flyToAirdrop(airdrop, session) then
                 if farmSession ~= session then break end
+
                 airdropStatus.Text = "🪂 Collecting..."
-                airdropStatus.TextColor3 = Color3.fromRGB(255, 255, 0)
 
                 if collectAirdrop(airdrop, session) then
                     if farmSession ~= session then break end
+
+                    print("💰 Collected! Hopping...")
                     airdropStatus.Text = "💰 Collected! Hopping..."
-                    airdropStatus.TextColor3 = Color3.fromRGB(0, 255, 100)
                     task.wait(1)
-                    serverHop()
+                    if _G.serverHop then _G.serverHop() end
                     return
                 else
                     if farmSession ~= session then break end
                     airdropStatus.Text = "❌ Collection failed"
-                    airdropStatus.TextColor3 = Color3.fromRGB(255, 0, 0)
                     task.wait(5)
                 end
             else
                 if farmSession ~= session then break end
                 airdropStatus.Text = "❌ Failed to reach"
-                airdropStatus.TextColor3 = Color3.fromRGB(255, 0, 0)
                 disableFlight()
                 task.wait(5)
             end
@@ -554,21 +644,20 @@ local function farmAirdrops()
         else
             noAirdropTimer = noAirdropTimer + 1
             airdropStatus.Text = "🪂 Scanning... " .. noAirdropTimer .. "s"
-            if noAirdropTimer >= 8 then
+
+            if noAirdropTimer >= 15 then
                 noAirdropTimer = 0
-                serverHop()
+                print("🔀 No airdrop for 15s, hopping...")
+                if _G.serverHop then _G.serverHop() end
                 return
             end
+
             task.wait(1)
         end
     end
-
-    print("🛑 Farm loop ended (session " .. session .. " expired)")
 end
 
--- =============================================
--- RESPAWN HANDLER
--- =============================================
+-- === RESPAWN HANDLER ===
 player.CharacterAdded:Connect(function()
     print("💀 Respawned!")
     farmSession = farmSession + 1
@@ -585,9 +674,7 @@ player.CharacterAdded:Connect(function()
     task.spawn(farmAirdrops)
 end)
 
--- =============================================
--- START
--- =============================================
+-- === START ===
 task.spawn(function()
     task.wait(3)
     exitStatus.Text = "🚶 Auto-Exit: Running..."
@@ -598,4 +685,11 @@ task.spawn(function()
     farmAirdrops()
 end)
 
-print("✅ AUTO FARM LOADED!")
+print("✅ GITHUB AUTO FARM LOADED!")
+print("🚀 Server hop enabled - will auto-reload!")
+]]
+
+print("✅ Loader script ready!")
+print("📝 STEP 1: Replace YOUR_USERNAME/YOUR_REPO/YOUR_FILE.lua with your actual GitHub info")
+print("📝 STEP 2: Copy the main script section (below the loader) and upload it to GitHub")
+print("📝 STEP 3: Run this loader in Xeno")
