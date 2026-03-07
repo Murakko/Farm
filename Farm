@@ -6,15 +6,19 @@ local GITHUB_URL = "https://raw.githubusercontent.com/Murakko/Farm/refs/heads/ma
 local WS_URL = "wss://auto-farm--insanetothink.replit.app"
 
 -- Connect to WebSocket server to get latest script on every server join
-local socket = WebSocket.connect(WS_URL)
-socket.OnMessage:Connect(function(msg)
-    print("🔄 Received script from WebSocket!")
-    loadstring(msg)()
-end)
-socket.OnClose:Connect(function()
-    print("🔌 WebSocket closed")
-end)
-print("✅ WebSocket connected!")
+if not _G.AutoFarmLoaded then
+    _G.AutoFarmLoaded = true
+    local socket = WebSocket.connect(WS_URL)
+    socket.OnMessage:Connect(function(msg)
+        print("🔄 Received script from WebSocket!")
+        loadstring(msg)()
+    end)
+    socket.OnClose:Connect(function()
+        print("🔌 WebSocket closed")
+        _G.AutoFarmLoaded = nil
+    end)
+    print("✅ WebSocket connected!")
+end
 
 local player = game:GetService("Players").LocalPlayer
 local vim = game:GetService("VirtualInputManager")
