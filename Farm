@@ -440,25 +440,21 @@ local function collectAirdrop(airdrop, session)
 end
 
 -- =============================================
--- SERVER HOP (passes autoFarm flag in TeleportData)
+-- SERVER HOP
 -- =============================================
 local function serverHop()
     print("🔀 Server hopping...")
     airdropStatus.Text = "🔀 Server hopping..."
     airdropStatus.TextColor3 = Color3.fromRGB(255, 165, 0)
 
-    local teleportOptions = Instance.new("TeleportOptions")
-    teleportOptions.TeleportData = { autoFarm = true }
-
     local success, err = pcall(function()
-        teleportService:TeleportAsync(game.PlaceId, {player}, teleportOptions)
+        teleportService:Teleport(game.PlaceId, player, {autoFarm = true})
     end)
 
     if not success then
-        -- fallback
-        pcall(function()
-            teleportService:Teleport(game.PlaceId, player)
-        end)
+        print("❌ Server hop failed: " .. tostring(err))
+        airdropStatus.Text = "❌ Hop failed"
+        airdropStatus.TextColor3 = Color3.fromRGB(255, 0, 0)
     end
 end
 
