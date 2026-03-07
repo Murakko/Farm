@@ -2,21 +2,23 @@
 -- AUTO FARM - SELF RELOADING VERSION
 -- =============================================
 
--- Inject into Xeno's CoreGui folder to survive teleports
-local CoreGui = game:GetService("CoreGui")
-local XenoFolder = CoreGui:FindFirstChild("12344")
-if XenoFolder and not XenoFolder:FindFirstChild("AutoFarm") then
-    local s = Instance.new("LocalScript")
-    s.Name = "AutoFarm"
-    s.Source = game:HttpGet("https://raw.githubusercontent.com/Murakko/Farm/refs/heads/main/Farm")
-    s.Parent = XenoFolder
-    s.Disabled = false
-    print("✅ Injected into Xeno folder - will survive teleports!")
-elseif syn and syn.protect_gui then
-    syn.protect_gui(script)
-    script.Parent = CoreGui
-elseif gethui then
-    script.Parent = gethui()
+local GITHUB_URL = "https://raw.githubusercontent.com/Murakko/Farm/refs/heads/main/Farm"
+
+-- getgenv() persists across teleports in Xeno unlike _G
+local env = getgenv and getgenv() or _G
+
+-- If already flagged as running after a hop, just continue
+if env.AutoFarmHopped then
+    env.AutoFarmHopped = nil
+    print("🔄 Reloaded in new server after hop!")
+    -- fall through and run the script normally
+else
+    -- First run - set up auto reload on teleport
+    if env.AutoFarmLoaded then
+        print("⚠️ Already loaded - stopping duplicate")
+        return
+    end
+    env.AutoFarmLoaded = true
 end
 
 local player = game:GetService("Players").LocalPlayer
@@ -25,15 +27,6 @@ local teleportService = game:GetService("TeleportService")
 local HttpService = game:GetService("HttpService")
 
 local GITHUB_URL = "https://raw.githubusercontent.com/Murakko/Farm/refs/heads/main/Farm"
-
--- =============================================
--- SELF RELOAD AFTER SERVER HOP
--- =============================================
-if _G.AutoFarmRunning then
-    print("🔄 Already running - skipping reload loop")
-    return
-end
-_G.AutoFarmRunning = true
 
 -- =============================================
 -- GUI
@@ -460,8 +453,10 @@ local function serverHop()
     airdropStatus.Text = "🔀 Server hopping..."
     airdropStatus.TextColor3 = Color3.fromRGB(255, 165, 0)
 
-    -- Reset flag so script reloads properly in new server
-    _G.AutoFarmRunning = nil
+    -- Set flag in getgenv so it persists after teleport
+    local env = getgenv and getgenv() or _G
+    env.AutoFarmLoaded = nil
+    env.AutoFarmHopped = true
 
     local success, err = pcall(function()
         teleportService:Teleport(game.PlaceId, player, {autoFarm = true})
@@ -472,16 +467,19 @@ local function serverHop()
         airdropStatus.Text = "❌ Hop failed"
         airdropStatus.TextColor3 = Color3.fromRGB(255, 0, 0)
         isHopping = false
-        _G.AutoFarmRunning = true
+        env.AutoFarmLoaded = true
+        env.AutoFarmHopped = nil
+        return
+    end
+
+    -- Wait for new server then reload from GitHub
+    task.wait(6)
+    print("🔄 Reloading from GitHub...")
+    local ok, src = pcall(function() return game:HttpGet(GITHUB_URL) end)
+    if ok and src then
+        loadstring(src)()
     else
-        -- Wait for teleport then reload from GitHub
-        task.wait(5)
-        _G.AutoFarmRunning = nil
-        local ok, src = pcall(function() return game:HttpGet(GITHUB_URL) end)
-        if ok and src then
-            print("🔄 Reloading in new server...")
-            loadstring(src)()
-        end
+        warn("❌ Failed to reload: " .. tostring(src))
     end
 end
 
