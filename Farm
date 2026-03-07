@@ -13,10 +13,24 @@ local GITHUB_URL = "https://raw.githubusercontent.com/Murakko/Farm/refs/heads/ma
 -- SELF RELOAD AFTER SERVER HOP
 -- =============================================
 local joinData = teleportService:GetLocalPlayerTeleportData()
-if (joinData and joinData.autoFarm) or _G.autoFarmReload then
-    _G.autoFarmReload = nil
-    print("🔄 Reloaded after server hop - starting farm...")
+if joinData and joinData.autoFarm then
+    print("🔄 Reloading after server hop...")
     task.wait(3)
+    local ok, src = pcall(function() return game:HttpGet(GITHUB_URL) end)
+    if ok and src then
+        -- Inject a flag so the reloaded script knows not to loop
+        loadstring("_G.fromHop = true")()
+        loadstring(src)()
+    else
+        warn("❌ Failed to reload: " .. tostring(src))
+    end
+    return
+end
+
+-- If we got here from a hop reload, skip the teleport check
+if _G.fromHop then
+    _G.fromHop = nil
+    print("✅ Script running after hop reload!")
 end
 
 -- =============================================
@@ -444,8 +458,6 @@ local function serverHop()
     airdropStatus.Text = "🔀 Server hopping..."
     airdropStatus.TextColor3 = Color3.fromRGB(255, 165, 0)
 
-    _G.autoFarmReload = true
-
     local success, err = pcall(function()
         teleportService:Teleport(game.PlaceId, player, {autoFarm = true})
     end)
@@ -455,7 +467,6 @@ local function serverHop()
         airdropStatus.Text = "❌ Hop failed"
         airdropStatus.TextColor3 = Color3.fromRGB(255, 0, 0)
         isHopping = false
-        _G.autoFarmReload = nil
     end
 end
 
