@@ -110,6 +110,7 @@ local flightSpeed = 180
 local currentAirdrop = nil
 local farmSession = 0
 local EXIT_SPEED = 80
+local isHopping = false
 
 -- =============================================
 -- FLIGHT
@@ -440,6 +441,8 @@ end
 -- SERVER HOP
 -- =============================================
 local function serverHop()
+    if isHopping then return end
+    isHopping = true
     print("🔀 Server hopping...")
     airdropStatus.Text = "🔀 Server hopping..."
     airdropStatus.TextColor3 = Color3.fromRGB(255, 165, 0)
@@ -452,6 +455,7 @@ local function serverHop()
         print("❌ Server hop failed: " .. tostring(err))
         airdropStatus.Text = "❌ Hop failed"
         airdropStatus.TextColor3 = Color3.fromRGB(255, 0, 0)
+        isHopping = false
     end
 end
 
