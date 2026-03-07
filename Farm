@@ -13,13 +13,10 @@ local GITHUB_URL = "https://raw.githubusercontent.com/Murakko/Farm/refs/heads/ma
 -- SELF RELOAD AFTER SERVER HOP
 -- =============================================
 local joinData = teleportService:GetLocalPlayerTeleportData()
-if joinData and joinData.autoFarm then
-    print("🔄 Reloading after server hop...")
+if (joinData and joinData.autoFarm) or _G.autoFarmReload then
+    _G.autoFarmReload = nil
+    print("🔄 Reloaded after server hop - starting farm...")
     task.wait(3)
-    -- Run the rest of this script directly without fetching from GitHub again
-    -- by just falling through to the main script below
-    -- We clear the flag so it doesn't loop
-    joinData = nil
 end
 
 -- =============================================
@@ -447,6 +444,8 @@ local function serverHop()
     airdropStatus.Text = "🔀 Server hopping..."
     airdropStatus.TextColor3 = Color3.fromRGB(255, 165, 0)
 
+    _G.autoFarmReload = true
+
     local success, err = pcall(function()
         teleportService:Teleport(game.PlaceId, player, {autoFarm = true})
     end)
@@ -456,6 +455,7 @@ local function serverHop()
         airdropStatus.Text = "❌ Hop failed"
         airdropStatus.TextColor3 = Color3.fromRGB(255, 0, 0)
         isHopping = false
+        _G.autoFarmReload = nil
     end
 end
 
@@ -530,12 +530,14 @@ local function farmAirdrops()
             airdropStatus.TextColor3 = Color3.fromRGB(255, 255, 0)
             currentAirdrop = nil
         else
-            noAirdropTimer = noAirdropTimer + 1
-            airdropStatus.Text = "🪂 Scanning... " .. noAirdropTimer .. "s"
-            if noAirdropTimer >= 8 then
-                noAirdropTimer = 0
-                serverHop()
-                return
+            if not collecting then
+                noAirdropTimer = noAirdropTimer + 1
+                airdropStatus.Text = "🪂 Scanning... " .. noAirdropTimer .. "s"
+                if noAirdropTimer >= 8 then
+                    noAirdropTimer = 0
+                    serverHop()
+                    return
+                end
             end
             task.wait(1)
         end
