@@ -15,14 +15,11 @@ local GITHUB_URL = "https://raw.githubusercontent.com/Murakko/Farm/refs/heads/ma
 local joinData = teleportService:GetLocalPlayerTeleportData()
 if joinData and joinData.autoFarm then
     print("🔄 Reloading after server hop...")
-    task.wait(2)
-    local ok, src = pcall(function() return game:HttpGet(GITHUB_URL) end)
-    if ok and src then
-        loadstring(src)()
-    else
-        warn("❌ Failed to reload from GitHub")
-    end
-    return
+    task.wait(3)
+    -- Run the rest of this script directly without fetching from GitHub again
+    -- by just falling through to the main script below
+    -- We clear the flag so it doesn't loop
+    joinData = nil
 end
 
 -- =============================================
