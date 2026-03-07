@@ -3,23 +3,18 @@
 -- =============================================
 
 local GITHUB_URL = "https://raw.githubusercontent.com/Murakko/Farm/refs/heads/main/Farm"
+local WS_URL = "wss://auto-farm--insanetothink.replit.app"
 
--- getgenv() persists across teleports in Xeno unlike _G
-local env = getgenv and getgenv() or _G
-
--- If already flagged as running after a hop, just continue
-if env.AutoFarmHopped then
-    env.AutoFarmHopped = nil
-    print("🔄 Reloaded in new server after hop!")
-    -- fall through and run the script normally
-else
-    -- First run - set up auto reload on teleport
-    if env.AutoFarmLoaded then
-        print("⚠️ Already loaded - stopping duplicate")
-        return
-    end
-    env.AutoFarmLoaded = true
-end
+-- Connect to WebSocket server to get latest script on every server join
+local socket = WebSocket.connect(WS_URL)
+socket.OnMessage:Connect(function(msg)
+    print("🔄 Received script from WebSocket!")
+    loadstring(msg)()
+end)
+socket.OnClose:Connect(function()
+    print("🔌 WebSocket closed")
+end)
+print("✅ WebSocket connected!")
 
 local player = game:GetService("Players").LocalPlayer
 local vim = game:GetService("VirtualInputManager")
