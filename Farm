@@ -3,27 +3,23 @@
 -- =============================================
 
 local GITHUB_URL = "https://raw.githubusercontent.com/Murakko/Farm/refs/heads/main/Farm"
-local WS_URL = "wss://auto-farm--insanetothink.replit.app"
 
--- Connect to WebSocket server to get latest script on every server join
-if not _G.AutoFarmLoaded then
-    _G.AutoFarmLoaded = true
-    local socket = WebSocket.connect(WS_URL)
-    wsSocket = socket
-    socket.OnMessage:Connect(function(msg)
-        print("🔄 Received script from WebSocket!")
-        _G.AutoFarmLoaded = true
-        loadstring(msg)()
+-- Write to Xeno's autoexec folder so it runs on every server join automatically
+if writefile then
+    local loaderScript = 'loadstring(game:HttpGet("' .. GITHUB_URL .. '"))()'
+    pcall(function()
+        writefile("autoexec/AutoFarm.lua", loaderScript)
+        print("✅ Written to autoexec - will auto reload after every hop!")
     end)
-    socket.OnClose:Connect(function()
-        print("🔌 WebSocket closed - will reconnect on next server")
-        _G.AutoFarmLoaded = nil
-        wsSocket = nil
-    end)
-    print("✅ WebSocket connected!")
-else
-    print("✅ Running from WebSocket - skipping WS setup")
 end
+
+-- Prevent duplicate runs
+local env = getgenv()
+if env.AutoFarmRunning then
+    print("⚠️ Already running - stopping duplicate")
+    return
+end
+env.AutoFarmRunning = true
 
 local player = game:GetService("Players").LocalPlayer
 local vim = game:GetService("VirtualInputManager")
@@ -450,8 +446,6 @@ end
 -- =============================================
 -- SERVER HOP
 -- =============================================
-local wsSocket = nil -- store socket reference globally
-
 local function serverHop()
     if isHopping then return end
     isHopping = true
@@ -459,8 +453,12 @@ local function serverHop()
     airdropStatus.Text = "🔀 Server hopping..."
     airdropStatus.TextColor3 = Color3.fromRGB(255, 165, 0)
 
+    -- Reset flag so autoexec script runs fresh in new server
+    local env = getgenv()
+    env.AutoFarmRunning = nil
+
     local success, err = pcall(function()
-        teleportService:Teleport(game.PlaceId, player, {autoFarm = true})
+        teleportService:Teleport(game.PlaceId, player)
     end)
 
     if not success then
@@ -468,6 +466,7 @@ local function serverHop()
         airdropStatus.Text = "❌ Hop failed"
         airdropStatus.TextColor3 = Color3.fromRGB(255, 0, 0)
         isHopping = false
+        env.AutoFarmRunning = true
     end
 end
 
