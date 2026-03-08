@@ -490,63 +490,46 @@ local function collectAirdrop(airdrop, session)
 end
 
 -- =============================================
--- AIRDROP SERVER TRACKER (jailbreakchangelogs.xyz)
+-- AIRDROP SERVER TRACKER
 -- =============================================
 local trackedServerIds = {}
-local wsConnected = false
 
-local function connectAirdropTracker()
+local function pollAirdropTracker()
     task.spawn(function()
-        pcall(function()
-            local ws = WebSocket.connect("wss://inventories.jailbreakchangelogs.xyz/tracker?type=airdrops")
-            wsConnected = true
-            print("Airdrop tracker connected!")
-
-            ws.OnMessage:Connect(function(msg)
-                pcall(function()
-                    local data = game:GetService("HttpService"):JSONDecode(msg)
-                    print("Tracker msg: " .. (data and data.action or "unknown"))
-                    if data and data.action == "recent_airdrops" and data.data then
-                        print("Raw airdrop count: " .. #data.data)
-                        trackedServerIds = {}
-                        local now = os.time()
-                        print("Current time: " .. now)
-                        for _, airdrop in ipairs(data.data) do
-                            if airdrop.server and airdrop.server.job_id then
-                                local jobId = airdrop.server.job_id
-                                local age = airdrop.server.timestamp and (now - airdrop.server.timestamp) or 9999
-                                print("Server: " .. jobId .. " | age: " .. age .. "s | gone_at: " .. tostring(airdrop.gone_at) .. " | now: " .. now)
-                                if jobId == game.JobId then
-                                    print("^ skipping (current server)")
-                                    continue
-                                end
-                                local notExpired = airdrop.gone_at and airdrop.gone_at > now
-                                local notTooOld = age < 60
+        while true do
+            pcall(function()
+                local raw = game:HttpGet("https://inventories.jailbreakchangelogs.xyz/airdrops", true)
+                if raw and #raw > 5 then
+                    local data = game:GetService("HttpService"):JSONDecode(raw)
+                    local now = os.time()
+                    local newList = {}
+                    local list = (type(data) == "table" and data.data) or data
+                    if type(list) == "table" then
+                        for _, airdrop in ipairs(list) do
+                            local jobId = airdrop.job_id or (airdrop.server and airdrop.server.job_id)
+                            local timestamp = airdrop.timestamp or (airdrop.server and airdrop.server.timestamp)
+                            local gone_at = airdrop.gone_at
+                            if jobId and jobId ~= game.JobId then
+                                local notExpired = gone_at == nil or gone_at > now
+                                local notTooOld = timestamp == nil or (now - timestamp) < 60
                                 if notExpired and notTooOld then
-                                    table.insert(trackedServerIds, jobId)
-                                    print("^ ADDED!")
-                                else
-                                    print("^ skipped (expired=" .. tostring(not notExpired) .. " tooOld=" .. tostring(not notTooOld) .. ")")
+                                    table.insert(newList, jobId)
                                 end
                             end
                         end
-                        print("Final tracked count: " .. #trackedServerIds)
                     end
-                end)
+                    if #newList > 0 then
+                        trackedServerIds = newList
+                        print("Tracker found " .. #trackedServerIds .. " active airdrop servers!")
+                    end
+                end
             end)
-
-            ws.OnClose:Connect(function()
-                wsConnected = false
-                trackedServerIds = {}
-                print("Airdrop tracker disconnected, reconnecting...")
-                task.wait(5)
-                connectAirdropTracker()
-            end)
-        end)
+            task.wait(2)
+        end
     end)
 end
 
-connectAirdropTracker()
+pollAirdropTracker()
 
 -- =============================================
 -- SERVER HOP
