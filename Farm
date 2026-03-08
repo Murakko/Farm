@@ -502,6 +502,16 @@ local function connectAirdropTracker()
             wsConnected = true
             print("Airdrop tracker connected!")
 
+            -- Request fresh data every 2 seconds
+            task.spawn(function()
+                while wsConnected do
+                    pcall(function()
+                        ws:Send(game:GetService("HttpService"):JSONEncode({action = "get_airdrops"}))
+                    end)
+                    task.wait(2)
+                end
+            end)
+
             ws.OnMessage:Connect(function(msg)
                 pcall(function()
                     local data = game:GetService("HttpService"):JSONDecode(msg)
@@ -510,14 +520,15 @@ local function connectAirdropTracker()
                         local now = os.time()
                         for _, airdrop in ipairs(data.data) do
                             if airdrop.server and airdrop.server.job_id and airdrop.server.job_id ~= game.JobId then
-                                -- Only include if airdrop hasn't expired yet
-                                if airdrop.gone_at and airdrop.gone_at > now then
+                                local notExpired = airdrop.gone_at and airdrop.gone_at > now
+                                local notTooOld = airdrop.server.timestamp and (now - airdrop.server.timestamp) < 60
+                                if notExpired and notTooOld then
                                     table.insert(trackedServerIds, airdrop.server.job_id)
                                 end
                             end
                         end
                         if #trackedServerIds > 0 then
-                            print("Tracker found " .. #trackedServerIds .. " servers with airdrops!")
+                            print("Tracker found " .. #trackedServerIds .. " active servers!")
                         end
                     end
                 end)
@@ -547,24 +558,20 @@ local function serverHop()
     setYellow(hopDot)
 
     local success, err = pcall(function()
-        -- Try tracked servers with active airdrops first
-        if #trackedServerIds > 0 then
-            local targetId = trackedServerIds[1]
-            print("Hopping to tracked airdrop server: " .. targetId)
-            teleportService:TeleportToPlaceInstance(game.PlaceId, targetId, player)
-            return
+        -- Wait until tracker has a valid server
+        if #trackedServerIds == 0 then
+            print("Waiting for tracker to find an airdrop...")
+            hopStatus.Text = "Waiting for airdrop..."
+            setBlue(hopDot)
+            while #trackedServerIds == 0 do
+                task.wait(0.5)
+            end
+            print("Tracker found one! Hopping now...")
         end
 
-        -- Fallback if tracker has nothing
-        print("No tracked servers yet, waiting for tracker...")
-        hopStatus.Text = "Waiting for tracker..."
-        task.wait(5)
-        if #trackedServerIds > 0 then
-            local targetId = trackedServerIds[1]
-            teleportService:TeleportToPlaceInstance(game.PlaceId, targetId, player)
-        else
-            teleportService:Teleport(game.PlaceId, player)
-        end
+        local targetId = trackedServerIds[1]
+        print("Hopping to tracked airdrop server: " .. targetId)
+        teleportService:TeleportToPlaceInstance(game.PlaceId, targetId, player)
     end)
 
     if not success then
