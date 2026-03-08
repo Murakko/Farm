@@ -2,6 +2,15 @@
 -- AUTO FARM - FINAL VERSION
 -- =============================================
 
+-- Prevent duplicate instances from stacking
+if getgenv().AutoFarmLoaded then
+    print("AUTO FARM already running, stopping old instance...")
+    getgenv().AutoFarmSession = (getgenv().AutoFarmSession or 0) + 1
+end
+local myInstance = (getgenv().AutoFarmSession or 0)
+getgenv().AutoFarmLoaded = true
+getgenv().AutoFarmSession = myInstance
+
 local Players = game:GetService("Players")
 local player = Players.LocalPlayer or Players:GetPropertyChangedSignal("LocalPlayer"):Wait()
 if not player then
@@ -489,98 +498,7 @@ local function collectAirdrop(airdrop, session)
     return false
 end
 
--- =============================================
--- AIRDROP SERVER TRACKER (WebSocket)
--- =============================================
-local trackedServerIds = {}
-local JBCL_TOKEN = "thFdYuVNLvfcaUQWjAOI3q7IkhAOak8ACcSYzcUFL2o"
-local AUTH_TOKEN = "8e7oJuExlVak1xtuBZ"
-
-local function processTrackerData(raw)
-    local parseOk, data = pcall(function()
-        return game:GetService("HttpService"):JSONDecode(raw)
-    end)
-    if not parseOk or not data then return end
-
-    local now = os.time()
-    local newList = {}
-    local list = (type(data) == "table" and data.data) or data
-    if type(list) ~= "table" then return end
-
-    for _, airdrop in ipairs(list) do
-        local jobId = airdrop.job_id or (airdrop.server and airdrop.server.job_id)
-        local timestamp = airdrop.timestamp or (airdrop.server and airdrop.server.timestamp)
-        local gone_at = airdrop.gone_at
-        if jobId and jobId ~= game.JobId then
-            local notExpired = gone_at == nil or gone_at > now
-            local notTooOld = timestamp == nil or (now - timestamp) < 90
-            if notExpired and notTooOld then
-                table.insert(newList, jobId)
-            end
-        end
-    end
-
-    if #newList > 0 then
-        trackedServerIds = newList
-        print("Tracker: " .. #trackedServerIds .. " active airdrop server(s) found!")
-    end
-end
-
-local function connectTrackerWS()
-    task.spawn(function()
-        while true do
-            local ok, ws = pcall(function()
-                return WebSocket.connect(
-                    "wss://inventories.jailbreakchangelogs.xyz/tracker?type=airdrops",
-                    {
-                        ["Cookie"] = "jbcl_token=" .. JBCL_TOKEN .. "; token=" .. AUTH_TOKEN,
-                        ["Origin"] = "https://jailbreakchangelogs.xyz",
-                    }
-                )
-            end)
-
-            if not ok or not ws then
-                print("Tracker WS connect failed: " .. tostring(ws))
-                task.wait(5)
-            else
-                print("Tracker WS connected!")
-                hopStatus.Text = "Tracker: Connected"
-                setGreen(hopDot)
-
-                local closed = false
-                ws.OnClose:Connect(function()
-                    closed = true
-                    print("Tracker WS closed, reconnecting...")
-                    hopStatus.Text = "Tracker: Reconnecting"
-                    setYellow(hopDot)
-                end)
-
-                ws.OnMessage:Connect(function(msg)
-                    print("Tracker msg: " .. tostring(msg):sub(1, 200))
-                    local ok2, decoded = pcall(function()
-                        return game:GetService("HttpService"):JSONDecode(msg)
-                    end)
-                    if ok2 and decoded then
-                        local action = decoded.action
-                        local data = decoded.data
-                        if (action == "recent_airdrops" or action == "airdrop_update") and data then
-                            processTrackerData(game:GetService("HttpService"):JSONEncode(data))
-                        end
-                    end
-                end)
-
-                -- Keep alive while open
-                while not closed do
-                    task.wait(1)
-                end
-            end
-
-            task.wait(3)
-        end
-    end)
-end
-
-connectTrackerWS()
+-- (Tracker removed - server requires auth we can't provide. Blind hop works fine.)
 
 -- =============================================
 -- SERVER HOP
@@ -593,45 +511,24 @@ local function serverHop()
     setYellow(hopDot)
 
     local success, err = pcall(function()
-        -- Wait up to 8s for tracker, then fall back to blind hop
-        if #trackedServerIds == 0 then
-            print("Waiting for tracker (max 8s)...")
-            hopStatus.Text = "Waiting for tracker..."
-            setBlue(hopDot)
-            local waited = 0
-            while #trackedServerIds == 0 and waited < 8 do
-                task.wait(0.5)
-                waited = waited + 0.5
+        local HttpService = game:GetService("HttpService")
+        local response = request({
+            Url = "https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100",
+            Method = "GET"
+        })
+        local serverData = HttpService:JSONDecode(response.Body)
+        local currentJobId = game.JobId
+        for _, server in ipairs(serverData.data or {}) do
+            if server.id ~= currentJobId and server.playing and server.playing > 0 then
+                print("Hopping to server: " .. server.id)
+                teleportService:TeleportToPlaceInstance(game.PlaceId, server.id, player)
+                return
             end
         end
-
-        if #trackedServerIds > 0 then
-            local targetId = trackedServerIds[1]
-            table.remove(trackedServerIds, 1)
-            print("Hopping to tracked airdrop server: " .. targetId)
-            hopStatus.Text = "Hopping (tracked)..."
-            setYellow(hopDot)
-            teleportService:TeleportToPlaceInstance(game.PlaceId, targetId, player)
-        else
-            -- Blind hop fallback
-            print("Tracker empty, doing blind hop...")
-            hopStatus.Text = "Blind hop..."
-            setYellow(hopDot)
-            local HttpService = game:GetService("HttpService")
-            local response = request({
-                Url = "https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100",
-                Method = "GET"
-            })
-            local serverData = HttpService:JSONDecode(response.Body)
-            local currentJobId = game.JobId
-            for _, server in ipairs(serverData.data or {}) do
-                if server.id ~= currentJobId and server.playing and server.playing > 0 then
-                    teleportService:TeleportToPlaceInstance(game.PlaceId, server.id, player)
-                    return
-                end
-            end
-            print("No valid servers found for blind hop")
-        end
+        print("No valid servers found")
+        hopStatus.Text = "No servers found"
+        setRed(hopDot)
+        isHopping = false
     end)
 
     if not success then
@@ -761,9 +658,13 @@ end)
 -- =============================================
 -- START
 -- =============================================
+-- If character already exists (loaded before script), start directly
+-- Otherwise CharacterAdded will handle it
 task.spawn(function()
-    task.wait(5)
-    runFarm()
+    task.wait(2)
+    if not farmStarted and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+        runFarm()
+    end
 end)
 
 print("AUTO FARM LOADED!")
