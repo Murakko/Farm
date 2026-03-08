@@ -497,33 +497,42 @@ local trackedServerIds = {}
 local function pollAirdropTracker()
     task.spawn(function()
         while true do
-            pcall(function()
-                local raw = game:HttpGet("https://inventories.jailbreakchangelogs.xyz/airdrops", true)
+            local ok, raw = pcall(function()
+                return game:HttpGet("https://inventories.jailbreakchangelogs.xyz/airdrops", true)
+            end)
+            if not ok then
+                print("Tracker HTTP error: " .. tostring(raw))
+            else
+                print("Tracker response: " .. tostring(raw):sub(1, 200))
                 if raw and #raw > 5 then
-                    local data = game:GetService("HttpService"):JSONDecode(raw)
-                    local now = os.time()
-                    local newList = {}
-                    local list = (type(data) == "table" and data.data) or data
-                    if type(list) == "table" then
-                        for _, airdrop in ipairs(list) do
-                            local jobId = airdrop.job_id or (airdrop.server and airdrop.server.job_id)
-                            local timestamp = airdrop.timestamp or (airdrop.server and airdrop.server.timestamp)
-                            local gone_at = airdrop.gone_at
-                            if jobId and jobId ~= game.JobId then
-                                local notExpired = gone_at == nil or gone_at > now
-                                local notTooOld = timestamp == nil or (now - timestamp) < 60
-                                if notExpired and notTooOld then
-                                    table.insert(newList, jobId)
+                    local parseOk, data = pcall(function()
+                        return game:GetService("HttpService"):JSONDecode(raw)
+                    end)
+                    if parseOk and data then
+                        local now = os.time()
+                        local newList = {}
+                        local list = (type(data) == "table" and data.data) or data
+                        if type(list) == "table" then
+                            for _, airdrop in ipairs(list) do
+                                local jobId = airdrop.job_id or (airdrop.server and airdrop.server.job_id)
+                                local timestamp = airdrop.timestamp or (airdrop.server and airdrop.server.timestamp)
+                                local gone_at = airdrop.gone_at
+                                if jobId and jobId ~= game.JobId then
+                                    local notExpired = gone_at == nil or gone_at > now
+                                    local notTooOld = timestamp == nil or (now - timestamp) < 60
+                                    if notExpired and notTooOld then
+                                        table.insert(newList, jobId)
+                                    end
                                 end
                             end
                         end
-                    end
-                    if #newList > 0 then
-                        trackedServerIds = newList
-                        print("Tracker found " .. #trackedServerIds .. " active airdrop servers!")
+                        if #newList > 0 then
+                            trackedServerIds = newList
+                            print("Tracker found " .. #trackedServerIds .. " active airdrop servers!")
+                        end
                     end
                 end
-            end)
+            end
             task.wait(2)
         end
     end)
