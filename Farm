@@ -1,22 +1,11 @@
 -- =============================================
--- AUTO FARM - SELF RELOADING VERSION
+-- AUTO FARM - FINAL VERSION
 -- =============================================
 
-local GITHUB_URL = "https://raw.githubusercontent.com/Murakko/Farm/refs/heads/main/Farm"
-
--- Write to Xeno's autoexec folder so it runs on every server join automatically
-if writefile then
-    local loaderScript = 'loadstring(game:HttpGet("' .. GITHUB_URL .. '"))()'
-    pcall(function()
-        writefile("autoexec/AutoFarm.lua", loaderScript)
-        print("✅ Written to autoexec - will auto reload after every hop!")
-    end)
-end
-
--- Prevent duplicate runs
+-- Prevent duplicate runs (important for autoexec)
 local env = getgenv()
 if env.AutoFarmRunning then
-    print("⚠️ Already running - stopping duplicate")
+    print("⚠️ AutoFarm already running - skipping duplicate")
     return
 end
 env.AutoFarmRunning = true
@@ -24,9 +13,6 @@ env.AutoFarmRunning = true
 local player = game:GetService("Players").LocalPlayer
 local vim = game:GetService("VirtualInputManager")
 local teleportService = game:GetService("TeleportService")
-local HttpService = game:GetService("HttpService")
-
-local GITHUB_URL = "https://raw.githubusercontent.com/Murakko/Farm/refs/heads/main/Farm"
 
 -- =============================================
 -- GUI
@@ -36,74 +22,117 @@ screenGui.Name = "AutoFarm"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = player:WaitForChild("PlayerGui")
 
+-- Main container
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 280, 0, 140)
-mainFrame.Position = UDim2.new(0, 10, 0.5, -70)
-mainFrame.BackgroundColor3 = Color3.fromRGB(10, 10, 15)
-mainFrame.BackgroundTransparency = 0.1
+mainFrame.Size = UDim2.new(0, 240, 0, 220)
+mainFrame.Position = UDim2.new(0, 16, 0.5, -110)
+mainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
 mainFrame.BorderSizePixel = 0
 mainFrame.Active = true
 mainFrame.Draggable = true
 mainFrame.Parent = screenGui
 
-local corner = Instance.new("UICorner")
-corner.CornerRadius = UDim.new(0, 10)
-corner.Parent = mainFrame
+local mainCorner = Instance.new("UICorner")
+mainCorner.CornerRadius = UDim.new(0, 12)
+mainCorner.Parent = mainFrame
 
-local title = Instance.new("TextLabel")
-title.Size = UDim2.new(1, -10, 0, 25)
-title.Position = UDim2.new(0, 5, 0, 5)
-title.BackgroundTransparency = 1
-title.Text = "🚔 AUTO FARM"
-title.TextColor3 = Color3.fromRGB(255, 255, 255)
-title.TextSize = 14
-title.TextXAlignment = Enum.TextXAlignment.Left
-title.Font = Enum.Font.GothamBold
-title.Parent = mainFrame
+local stroke = Instance.new("UIStroke")
+stroke.Color = Color3.fromRGB(50, 50, 65)
+stroke.Thickness = 1
+stroke.Parent = mainFrame
 
-local exitStatus = Instance.new("TextLabel")
-exitStatus.Size = UDim2.new(1, -10, 0, 20)
-exitStatus.Position = UDim2.new(0, 5, 0, 35)
-exitStatus.BackgroundTransparency = 1
-exitStatus.Text = "🚶 Auto-Exit: Ready"
-exitStatus.TextColor3 = Color3.fromRGB(0, 255, 100)
-exitStatus.TextSize = 12
-exitStatus.TextXAlignment = Enum.TextXAlignment.Left
-exitStatus.Font = Enum.Font.Gotham
-exitStatus.Parent = mainFrame
+-- Top accent bar
+local accentBar = Instance.new("Frame")
+accentBar.Size = UDim2.new(1, 0, 0, 3)
+accentBar.Position = UDim2.new(0, 0, 0, 0)
+accentBar.BackgroundColor3 = Color3.fromRGB(99, 102, 241)
+accentBar.BorderSizePixel = 0
+accentBar.Parent = mainFrame
+local accentCorner = Instance.new("UICorner")
+accentCorner.CornerRadius = UDim.new(0, 12)
+accentCorner.Parent = accentBar
 
-local airdropStatus = Instance.new("TextLabel")
-airdropStatus.Size = UDim2.new(1, -10, 0, 20)
-airdropStatus.Position = UDim2.new(0, 5, 0, 60)
-airdropStatus.BackgroundTransparency = 1
-airdropStatus.Text = "🪂 Airdrop: Scanning..."
-airdropStatus.TextColor3 = Color3.fromRGB(255, 255, 0)
-airdropStatus.TextSize = 12
-airdropStatus.TextXAlignment = Enum.TextXAlignment.Left
-airdropStatus.Font = Enum.Font.Gotham
-airdropStatus.Parent = mainFrame
+-- Title
+local titleLabel = Instance.new("TextLabel")
+titleLabel.Size = UDim2.new(1, -16, 0, 18)
+titleLabel.Position = UDim2.new(0, 12, 0, 14)
+titleLabel.BackgroundTransparency = 1
+titleLabel.Text = "AUTO FARM"
+titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+titleLabel.TextSize = 13
+titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+titleLabel.Font = Enum.Font.GothamBold
+titleLabel.Parent = mainFrame
 
-local npcStatus = Instance.new("TextLabel")
-npcStatus.Size = UDim2.new(1, -10, 0, 20)
-npcStatus.Position = UDim2.new(0, 5, 0, 85)
-npcStatus.BackgroundTransparency = 1
-npcStatus.Text = "🔫 NPC Killer: Active"
-npcStatus.TextColor3 = Color3.fromRGB(255, 100, 100)
-npcStatus.TextSize = 12
-npcStatus.TextXAlignment = Enum.TextXAlignment.Left
-npcStatus.Font = Enum.Font.Gotham
-npcStatus.Parent = mainFrame
+local subtitleLabel = Instance.new("TextLabel")
+subtitleLabel.Size = UDim2.new(1, -16, 0, 14)
+subtitleLabel.Position = UDim2.new(0, 12, 0, 32)
+subtitleLabel.BackgroundTransparency = 1
+subtitleLabel.Text = "Jailbreak · Active"
+subtitleLabel.TextColor3 = Color3.fromRGB(99, 102, 241)
+subtitleLabel.TextSize = 10
+subtitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+subtitleLabel.Font = Enum.Font.Gotham
+subtitleLabel.Parent = mainFrame
 
-local coordsLabel = Instance.new("TextLabel")
-coordsLabel.Size = UDim2.new(1, -10, 0, 20)
-coordsLabel.Position = UDim2.new(0, 5, 0, 110)
-coordsLabel.BackgroundTransparency = 1
-coordsLabel.Text = "📍 0, 0, 0"
-coordsLabel.TextColor3 = Color3.fromRGB(150, 150, 255)
-coordsLabel.TextSize = 10
-coordsLabel.TextXAlignment = Enum.TextXAlignment.Left
-coordsLabel.Font = Enum.Font.Code
-coordsLabel.Parent = mainFrame
+-- Divider
+local divider = Instance.new("Frame")
+divider.Size = UDim2.new(1, -24, 0, 1)
+divider.Position = UDim2.new(0, 12, 0, 52)
+divider.BackgroundColor3 = Color3.fromRGB(35, 35, 50)
+divider.BorderSizePixel = 0
+divider.Parent = mainFrame
+
+-- Helper to create status rows
+local function makeRow(yPos, icon, label)
+    local row = Instance.new("Frame")
+    row.Size = UDim2.new(1, -24, 0, 30)
+    row.Position = UDim2.new(0, 12, 0, yPos)
+    row.BackgroundColor3 = Color3.fromRGB(22, 22, 30)
+    row.BorderSizePixel = 0
+    row.Parent = mainFrame
+    local rowCorner = Instance.new("UICorner")
+    rowCorner.CornerRadius = UDim.new(0, 6)
+    rowCorner.Parent = row
+
+    local dot = Instance.new("Frame")
+    dot.Size = UDim2.new(0, 6, 0, 6)
+    dot.Position = UDim2.new(0, 10, 0.5, -3)
+    dot.BackgroundColor3 = Color3.fromRGB(99, 102, 241)
+    dot.BorderSizePixel = 0
+    dot.Parent = row
+    local dotCorner = Instance.new("UICorner")
+    dotCorner.CornerRadius = UDim.new(1, 0)
+    dotCorner.Parent = dot
+
+    local iconLabel = Instance.new("TextLabel")
+    iconLabel.Size = UDim2.new(0, 18, 1, 0)
+    iconLabel.Position = UDim2.new(0, 22, 0, 0)
+    iconLabel.BackgroundTransparency = 1
+    iconLabel.Text = icon
+    iconLabel.TextColor3 = Color3.fromRGB(130, 130, 160)
+    iconLabel.TextSize = 12
+    iconLabel.Font = Enum.Font.Gotham
+    iconLabel.Parent = row
+
+    local valueLabel = Instance.new("TextLabel")
+    valueLabel.Size = UDim2.new(1, -44, 1, 0)
+    valueLabel.Position = UDim2.new(0, 44, 0, 0)
+    valueLabel.BackgroundTransparency = 1
+    valueLabel.Text = label
+    valueLabel.TextColor3 = Color3.fromRGB(200, 200, 215)
+    valueLabel.TextSize = 11
+    valueLabel.TextXAlignment = Enum.TextXAlignment.Left
+    valueLabel.Font = Enum.Font.Gotham
+    valueLabel.Parent = row
+
+    return valueLabel, dot
+end
+
+local exitStatus, exitDot     = makeRow(60,  "↗", "Exit: Ready")
+local airdropStatus, airdropDot = makeRow(96,  "◈", "Scanning...")
+local npcStatus, npcDot       = makeRow(132, "✦", "NPC Killer: Active")
+local hopStatus, hopDot       = makeRow(168, "⇄", "Server Hop: Standby")
 
 -- =============================================
 -- VARIABLES
@@ -196,7 +225,8 @@ local function startNPCKiller()
         while true do
             if currentAirdrop and currentAirdrop.Parent then
                 local killed = killNPCsInDrop(currentAirdrop)
-                if killed > 0 then npcStatus.Text = "🔫 NPC Killer: Killed " .. killed end
+                if killed > 0 then npcStatus.Text = "Killed " .. killed
+                if killed > 0 then npcDot.BackgroundColor3 = Color3.fromRGB(239, 68, 68) end end
             end
             task.wait(0.1)
         end
@@ -411,10 +441,11 @@ local function collectAirdrop(airdrop, session)
             return false
         end
 
-        airdropStatus.Text = "🪂 Collecting... " .. math.floor(elapsed) .. "/" .. maxWait
+        airdropStatus.Text = "Collecting " .. math.floor(elapsed) .. "s"
 
         local killed = killNPCsInDrop(airdrop)
-        if killed > 0 then npcStatus.Text = "🔫 NPC Killer: Killed " .. killed end
+        if killed > 0 then npcStatus.Text = "Killed " .. killed
+                if killed > 0 then npcDot.BackgroundColor3 = Color3.fromRGB(239, 68, 68) end end
 
         if not airdrop or not airdrop.Parent then
             vim:SendKeyEvent(false, Enum.KeyCode.E, false, nil)
@@ -450,12 +481,12 @@ local function serverHop()
     if isHopping then return end
     isHopping = true
     print("🔀 Server hopping...")
-    airdropStatus.Text = "🔀 Server hopping..."
+    hopStatus.Text = "Hopping..."
+    hopDot.BackgroundColor3 = Color3.fromRGB(250, 204, 21)
     airdropStatus.TextColor3 = Color3.fromRGB(255, 165, 0)
 
-    -- Reset flag so autoexec script runs fresh in new server
-    local env = getgenv()
-    env.AutoFarmRunning = nil
+    -- Reset flag so autoexec runs fresh in new server
+    getgenv().AutoFarmRunning = nil
 
     local success, err = pcall(function()
         teleportService:Teleport(game.PlaceId, player)
@@ -463,10 +494,11 @@ local function serverHop()
 
     if not success then
         print("❌ Server hop failed: " .. tostring(err))
-        airdropStatus.Text = "❌ Hop failed"
+        hopStatus.Text = "Hop failed"
+        hopDot.BackgroundColor3 = Color3.fromRGB(239, 68, 68)
         airdropStatus.TextColor3 = Color3.fromRGB(255, 0, 0)
         isHopping = false
-        env.AutoFarmRunning = true
+        getgenv().AutoFarmRunning = true
     end
 end
 
@@ -505,39 +537,48 @@ local function farmAirdrops()
 
         if airdrop and not collecting then
             noAirdropTimer = 0
-            airdropStatus.Text = "✅ Airdrop found!"
+            airdropStatus.Text = "Airdrop found!"
+                airdropDot.BackgroundColor3 = Color3.fromRGB(34, 197, 94)
             airdropStatus.TextColor3 = Color3.fromRGB(0, 255, 0)
 
             local killed = killNPCsInDrop(airdrop)
-            if killed > 0 then npcStatus.Text = "🔫 NPC Killer: Killed " .. killed end
+            if killed > 0 then npcStatus.Text = "Killed " .. killed
+                if killed > 0 then npcDot.BackgroundColor3 = Color3.fromRGB(239, 68, 68) end end
 
             if flyToAirdrop(airdrop, session) then
                 if farmSession ~= session then break end
-                airdropStatus.Text = "🪂 Collecting..."
+                airdropStatus.Text = "Collecting..."
+                airdropDot.BackgroundColor3 = Color3.fromRGB(250, 204, 21)
                 airdropStatus.TextColor3 = Color3.fromRGB(255, 255, 0)
 
                 if collectAirdrop(airdrop, session) then
                     if farmSession ~= session then break end
-                    airdropStatus.Text = "💰 Collected! Hopping..."
+                    airdropStatus.Text = "Collected!"
+                    airdropDot.BackgroundColor3 = Color3.fromRGB(34, 197, 94)
+                    hopStatus.Text = "Hopping..."
+                    hopDot.BackgroundColor3 = Color3.fromRGB(250, 204, 21)
                     airdropStatus.TextColor3 = Color3.fromRGB(0, 255, 100)
                     task.wait(1)
                     serverHop()
                     return
                 else
                     if farmSession ~= session then break end
-                    airdropStatus.Text = "❌ Collection failed"
+                    airdropStatus.Text = "Collection failed"
+                    airdropDot.BackgroundColor3 = Color3.fromRGB(239, 68, 68)
                     airdropStatus.TextColor3 = Color3.fromRGB(255, 0, 0)
                     task.wait(5)
                 end
             else
                 if farmSession ~= session then break end
-                airdropStatus.Text = "❌ Failed to reach"
+                airdropStatus.Text = "Failed to reach"
+                airdropDot.BackgroundColor3 = Color3.fromRGB(239, 68, 68)
                 airdropStatus.TextColor3 = Color3.fromRGB(255, 0, 0)
                 disableFlight()
                 task.wait(5)
             end
 
-            airdropStatus.Text = "🪂 Scanning..."
+            airdropStatus.Text = "Scanning..."
+            airdropDot.BackgroundColor3 = Color3.fromRGB(99, 102, 241)
             airdropStatus.TextColor3 = Color3.fromRGB(255, 255, 0)
             currentAirdrop = nil
         else
@@ -568,9 +609,11 @@ player.CharacterAdded:Connect(function()
     currentAirdrop = nil
 
     task.wait(2)
-    exitStatus.Text = "🚶 Auto-Exit: Running..."
+    exitStatus.Text = "Running..."
+    exitDot.BackgroundColor3 = Color3.fromRGB(250, 204, 21)
     exitStation()
-    exitStatus.Text = "🚶 Auto-Exit: Complete"
+    exitStatus.Text = "Complete"
+    exitDot.BackgroundColor3 = Color3.fromRGB(34, 197, 94)
 
     task.wait(1)
     task.spawn(farmAirdrops)
@@ -581,9 +624,11 @@ end)
 -- =============================================
 task.spawn(function()
     task.wait(3)
-    exitStatus.Text = "🚶 Auto-Exit: Running..."
+    exitStatus.Text = "Running..."
+    exitDot.BackgroundColor3 = Color3.fromRGB(250, 204, 21)
     exitStation()
-    exitStatus.Text = "🚶 Auto-Exit: Complete"
+    exitStatus.Text = "Complete"
+    exitDot.BackgroundColor3 = Color3.fromRGB(34, 197, 94)
     startNPCKiller()
     task.wait(2)
     farmAirdrops()
