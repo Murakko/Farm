@@ -502,16 +502,6 @@ local function connectAirdropTracker()
             wsConnected = true
             print("Airdrop tracker connected!")
 
-            -- Request fresh data every 2 seconds
-            task.spawn(function()
-                while wsConnected do
-                    pcall(function()
-                        ws:Send(game:GetService("HttpService"):JSONEncode({action = "get_airdrops"}))
-                    end)
-                    task.wait(2)
-                end
-            end)
-
             ws.OnMessage:Connect(function(msg)
                 pcall(function()
                     local data = game:GetService("HttpService"):JSONDecode(msg)
@@ -519,16 +509,21 @@ local function connectAirdropTracker()
                         trackedServerIds = {}
                         local now = os.time()
                         for _, airdrop in ipairs(data.data) do
-                            if airdrop.server and airdrop.server.job_id and airdrop.server.job_id ~= game.JobId then
+                            if airdrop.server and airdrop.server.job_id then
+                                local jobId = airdrop.server.job_id
+                                -- Skip current server
+                                if jobId == game.JobId then continue end
                                 local notExpired = airdrop.gone_at and airdrop.gone_at > now
                                 local notTooOld = airdrop.server.timestamp and (now - airdrop.server.timestamp) < 60
                                 if notExpired and notTooOld then
-                                    table.insert(trackedServerIds, airdrop.server.job_id)
+                                    table.insert(trackedServerIds, jobId)
                                 end
                             end
                         end
                         if #trackedServerIds > 0 then
                             print("Tracker found " .. #trackedServerIds .. " active servers!")
+                        else
+                            print("Tracker has no fresh airdrops right now, waiting...")
                         end
                     end
                 end)
@@ -570,6 +565,7 @@ local function serverHop()
         end
 
         local targetId = trackedServerIds[1]
+        table.remove(trackedServerIds, 1)
         print("Hopping to tracked airdrop server: " .. targetId)
         teleportService:TeleportToPlaceInstance(game.PlaceId, targetId, player)
     end)
