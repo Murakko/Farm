@@ -287,7 +287,7 @@ end
 -- EXIT STATION
 -- =============================================
 local function exitStation()
-    task.wait(3)
+    task.wait(5)
     if not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then return end
     local pos = player.Character.HumanoidRootPart.Position
     local t = 8
@@ -589,7 +589,7 @@ player.CharacterAdded:Connect(function()
     collecting = false
     currentAirdrop = nil
 
-    task.wait(2)
+    task.wait(4)
     exitStatus.Text = "Running..."
     setYellow(exitDot)
     exitStation()
