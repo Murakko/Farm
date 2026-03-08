@@ -498,18 +498,22 @@ local wsConnected = false
 local function connectAirdropTracker()
     task.spawn(function()
         pcall(function()
-            local ws = WebSocket.connect("wss://jailbreakchangelogs.xyz/tracker?type=airdrops")
+            local ws = WebSocket.connect("wss://inventories.jailbreakchangelogs.xyz/tracker?type=airdrops")
             wsConnected = true
             print("Airdrop tracker connected!")
 
             ws.OnMessage:Connect(function(msg)
                 pcall(function()
                     local data = game:GetService("HttpService"):JSONDecode(msg)
-                    if data and data.type == "recent_airdrops" and data.data then
+                    if data and data.action == "recent_airdrops" and data.data then
                         trackedServerIds = {}
+                        local now = os.time()
                         for _, airdrop in ipairs(data.data) do
-                            if airdrop.job_id and airdrop.job_id ~= game.JobId then
-                                table.insert(trackedServerIds, airdrop.job_id)
+                            if airdrop.server and airdrop.server.job_id and airdrop.server.job_id ~= game.JobId then
+                                -- Only include if airdrop hasn't expired yet
+                                if airdrop.gone_at and airdrop.gone_at > now then
+                                    table.insert(trackedServerIds, airdrop.server.job_id)
+                                end
                             end
                         end
                         if #trackedServerIds > 0 then
