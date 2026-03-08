@@ -506,17 +506,22 @@ local function serverHop()
 
         local targetId = nil
         if data and data.data then
-            local bestServer = nil
-            local bestCount = math.huge
+            local servers = {}
             for _, server in ipairs(data.data) do
-                if server.id and server.id ~= game.JobId and server.playing and server.playing < server.maxPlayers then
-                    if server.playing < bestCount then
-                        bestCount = server.playing
-                        bestServer = server.id
+                if server.id and server.id ~= game.JobId and server.playing and server.maxPlayers then
+                    if server.playing < server.maxPlayers then
+                        table.insert(servers, server)
                     end
                 end
             end
-            targetId = bestServer
+            -- Sort by player count
+            table.sort(servers, function(a, b) return a.playing < b.playing end)
+            -- Pick a server from the middle
+            if #servers > 0 then
+                local midIndex = math.floor(#servers / 2)
+                midIndex = math.max(1, midIndex)
+                targetId = servers[midIndex].id
+            end
         end
 
         if targetId then
