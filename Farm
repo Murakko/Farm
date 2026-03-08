@@ -735,7 +735,9 @@ end
 local farmStarted = false
 
 local function runFarm()
+    if farmStarted then return end
     farmStarted = true
+    startNPCKiller()
     exitStatus.Text = "Running..."
     setYellow(exitDot)
     exitStation()
@@ -760,13 +762,8 @@ end)
 -- START
 -- =============================================
 task.spawn(function()
-    task.wait(3)
-    if farmStarted then return end
-    startNPCKiller()
-    task.wait(2)
-    if not farmStarted then
-        runFarm()
-    end
+    task.wait(5)
+    runFarm()
 end)
 
 print("AUTO FARM LOADED!")
