@@ -19,100 +19,124 @@ screenGui.Name = "AutoFarm"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = player:WaitForChild("PlayerGui")
 
+-- Glass background
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 240, 0, 220)
-mainFrame.Position = UDim2.new(0, 16, 0.5, -110)
-mainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
+mainFrame.Size = UDim2.new(0, 220, 0, 200)
+mainFrame.Position = UDim2.new(0, 14, 0, 14)
+mainFrame.BackgroundColor3 = Color3.fromRGB(12, 12, 18)
+mainFrame.BackgroundTransparency = 0.25
 mainFrame.BorderSizePixel = 0
 mainFrame.Active = true
 mainFrame.Draggable = true
 mainFrame.Parent = screenGui
 
 local mainCorner = Instance.new("UICorner")
-mainCorner.CornerRadius = UDim.new(0, 12)
+mainCorner.CornerRadius = UDim.new(0, 14)
 mainCorner.Parent = mainFrame
 
+-- Outer glow border
 local stroke = Instance.new("UIStroke")
-stroke.Color = Color3.fromRGB(50, 50, 65)
+stroke.Color = Color3.fromRGB(255, 255, 255)
+stroke.Transparency = 0.85
 stroke.Thickness = 1
 stroke.Parent = mainFrame
 
-local accentBar = Instance.new("Frame")
-accentBar.Size = UDim2.new(1, 0, 0, 3)
-accentBar.Position = UDim2.new(0, 0, 0, 0)
-accentBar.BackgroundColor3 = Color3.fromRGB(99, 102, 241)
-accentBar.BorderSizePixel = 0
-accentBar.Parent = mainFrame
-local accentCorner = Instance.new("UICorner")
-accentCorner.CornerRadius = UDim.new(0, 12)
-accentCorner.Parent = accentBar
+-- Inner glass sheen (top highlight)
+local sheen = Instance.new("Frame")
+sheen.Size = UDim2.new(1, -2, 0, 40)
+sheen.Position = UDim2.new(0, 1, 0, 1)
+sheen.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+sheen.BackgroundTransparency = 0.92
+sheen.BorderSizePixel = 0
+sheen.Parent = mainFrame
+local sheenCorner = Instance.new("UICorner")
+sheenCorner.CornerRadius = UDim.new(0, 13)
+sheenCorner.Parent = sheen
 
+-- Header bar
+local header = Instance.new("Frame")
+header.Size = UDim2.new(1, 0, 0, 44)
+header.Position = UDim2.new(0, 0, 0, 0)
+header.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+header.BackgroundTransparency = 0.94
+header.BorderSizePixel = 0
+header.Parent = mainFrame
+local headerCorner = Instance.new("UICorner")
+headerCorner.CornerRadius = UDim.new(0, 14)
+headerCorner.Parent = header
+
+-- Colored left accent pill
+local pill = Instance.new("Frame")
+pill.Size = UDim2.new(0, 3, 0, 22)
+pill.Position = UDim2.new(0, 12, 0, 11)
+pill.BackgroundColor3 = Color3.fromRGB(139, 92, 246)
+pill.BorderSizePixel = 0
+pill.Parent = mainFrame
+local pillCorner = Instance.new("UICorner")
+pillCorner.CornerRadius = UDim.new(1, 0)
+pillCorner.Parent = pill
+
+-- Title
 local titleLabel = Instance.new("TextLabel")
-titleLabel.Size = UDim2.new(1, -16, 0, 18)
-titleLabel.Position = UDim2.new(0, 12, 0, 14)
+titleLabel.Size = UDim2.new(1, -24, 0, 16)
+titleLabel.Position = UDim2.new(0, 22, 0, 8)
 titleLabel.BackgroundTransparency = 1
 titleLabel.Text = "AUTO FARM"
-titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-titleLabel.TextSize = 13
+titleLabel.TextColor3 = Color3.fromRGB(245, 245, 255)
+titleLabel.TextSize = 12
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
 titleLabel.Font = Enum.Font.GothamBold
 titleLabel.Parent = mainFrame
 
 local subtitleLabel = Instance.new("TextLabel")
-subtitleLabel.Size = UDim2.new(1, -16, 0, 14)
-subtitleLabel.Position = UDim2.new(0, 12, 0, 32)
+subtitleLabel.Size = UDim2.new(1, -24, 0, 12)
+subtitleLabel.Position = UDim2.new(0, 22, 0, 26)
 subtitleLabel.BackgroundTransparency = 1
-subtitleLabel.Text = "Jailbreak · Active"
-subtitleLabel.TextColor3 = Color3.fromRGB(99, 102, 241)
-subtitleLabel.TextSize = 10
+subtitleLabel.Text = "JAILBREAK"
+subtitleLabel.TextColor3 = Color3.fromRGB(139, 92, 246)
+subtitleLabel.TextSize = 9
 subtitleLabel.TextXAlignment = Enum.TextXAlignment.Left
-subtitleLabel.Font = Enum.Font.Gotham
+subtitleLabel.Font = Enum.Font.GothamBold
 subtitleLabel.Parent = mainFrame
 
+-- Divider
 local divider = Instance.new("Frame")
-divider.Size = UDim2.new(1, -24, 0, 1)
-divider.Position = UDim2.new(0, 12, 0, 52)
-divider.BackgroundColor3 = Color3.fromRGB(35, 35, 50)
+divider.Size = UDim2.new(1, -20, 0, 1)
+divider.Position = UDim2.new(0, 10, 0, 46)
+divider.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+divider.BackgroundTransparency = 0.88
 divider.BorderSizePixel = 0
 divider.Parent = mainFrame
 
-local function makeRow(yPos, icon, label)
+-- Row builder
+local function makeRow(yPos, label)
     local row = Instance.new("Frame")
-    row.Size = UDim2.new(1, -24, 0, 30)
-    row.Position = UDim2.new(0, 12, 0, yPos)
-    row.BackgroundColor3 = Color3.fromRGB(22, 22, 30)
+    row.Size = UDim2.new(1, -20, 0, 28)
+    row.Position = UDim2.new(0, 10, 0, yPos)
+    row.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    row.BackgroundTransparency = 0.94
     row.BorderSizePixel = 0
     row.Parent = mainFrame
     local rc = Instance.new("UICorner")
-    rc.CornerRadius = UDim.new(0, 6)
+    rc.CornerRadius = UDim.new(0, 7)
     rc.Parent = row
 
     local dot = Instance.new("Frame")
-    dot.Size = UDim2.new(0, 6, 0, 6)
+    dot.Size = UDim2.new(0, 7, 0, 7)
     dot.Position = UDim2.new(0, 10, 0.5, -3)
-    dot.BackgroundColor3 = Color3.fromRGB(99, 102, 241)
+    dot.BackgroundColor3 = Color3.fromRGB(139, 92, 246)
     dot.BorderSizePixel = 0
     dot.Parent = row
     local dc = Instance.new("UICorner")
     dc.CornerRadius = UDim.new(1, 0)
     dc.Parent = dot
 
-    local iconLbl = Instance.new("TextLabel")
-    iconLbl.Size = UDim2.new(0, 18, 1, 0)
-    iconLbl.Position = UDim2.new(0, 22, 0, 0)
-    iconLbl.BackgroundTransparency = 1
-    iconLbl.Text = icon
-    iconLbl.TextColor3 = Color3.fromRGB(130, 130, 160)
-    iconLbl.TextSize = 12
-    iconLbl.Font = Enum.Font.Gotham
-    iconLbl.Parent = row
-
     local valLbl = Instance.new("TextLabel")
-    valLbl.Size = UDim2.new(1, -44, 1, 0)
-    valLbl.Position = UDim2.new(0, 44, 0, 0)
+    valLbl.Size = UDim2.new(1, -28, 1, 0)
+    valLbl.Position = UDim2.new(0, 24, 0, 0)
     valLbl.BackgroundTransparency = 1
     valLbl.Text = label
-    valLbl.TextColor3 = Color3.fromRGB(200, 200, 215)
+    valLbl.TextColor3 = Color3.fromRGB(210, 210, 230)
     valLbl.TextSize = 11
     valLbl.TextXAlignment = Enum.TextXAlignment.Left
     valLbl.Font = Enum.Font.Gotham
@@ -121,10 +145,10 @@ local function makeRow(yPos, icon, label)
     return valLbl, dot
 end
 
-local exitStatus,    exitDot    = makeRow(60,  "->", "Exit: Ready")
-local airdropStatus, airdropDot = makeRow(96,  "o",  "Scanning...")
-local npcStatus,     npcDot     = makeRow(132, "*",  "NPC Killer: Active")
-local hopStatus,     hopDot     = makeRow(168, "<>", "Standby")
+local exitStatus,    exitDot    = makeRow(52,  "Exit: Ready")
+local airdropStatus, airdropDot = makeRow(84,  "Scanning...")
+local npcStatus,     npcDot     = makeRow(116, "NPC Killer: Active")
+local hopStatus,     hopDot     = makeRow(148, "Standby")
 
 local function setGreen(dot)  dot.BackgroundColor3 = Color3.fromRGB(34, 197, 94)  end
 local function setYellow(dot) dot.BackgroundColor3 = Color3.fromRGB(250, 204, 21) end
@@ -476,7 +500,32 @@ local function serverHop()
     setYellow(hopDot)
 
     local success, err = pcall(function()
-        teleportService:Teleport(game.PlaceId, player)
+        local url = "https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100"
+        local raw = game:HttpGet(url)
+        local data = game:GetService("HttpService"):JSONDecode(raw)
+
+        local targetId = nil
+        if data and data.data then
+            local bestServer = nil
+            local bestCount = math.huge
+            for _, server in ipairs(data.data) do
+                if server.id and server.id ~= game.JobId and server.playing and server.playing < server.maxPlayers then
+                    if server.playing < bestCount then
+                        bestCount = server.playing
+                        bestServer = server.id
+                    end
+                end
+            end
+            targetId = bestServer
+        end
+
+        if targetId then
+            print("Hopping to server: " .. targetId)
+            teleportService:TeleportToPlaceInstance(game.PlaceId, targetId, player)
+        else
+            print("No other server found, using fallback...")
+            teleportService:Teleport(game.PlaceId, player)
+        end
     end)
 
     if not success then
@@ -561,7 +610,7 @@ local function farmAirdrops()
             if not collecting then
                 noAirdropTimer = noAirdropTimer + 1
                 airdropStatus.Text = "Scanning... " .. noAirdropTimer .. "s"
-                if noAirdropTimer >= 8 then
+                if noAirdropTimer >= 10 then
                     noAirdropTimer = 0
                     serverHop()
                     return
@@ -577,22 +626,28 @@ end
 -- =============================================
 -- RESPAWN HANDLER
 -- =============================================
-player.CharacterAdded:Connect(function()
-    print("Respawned!")
-    farmSession = farmSession + 1
-    disableFlight()
-    collecting = false
-    currentAirdrop = nil
+local farmStarted = false
 
-    task.wait(4)
+local function runFarm()
+    farmStarted = true
     exitStatus.Text = "Running..."
     setYellow(exitDot)
     exitStation()
     exitStatus.Text = "Complete"
     setGreen(exitDot)
-
     task.wait(1)
-    task.spawn(farmAirdrops)
+    farmAirdrops()
+end
+
+player.CharacterAdded:Connect(function()
+    print("Respawned!")
+    farmSession = farmSession + 1
+    farmStarted = false
+    disableFlight()
+    collecting = false
+    currentAirdrop = nil
+    task.wait(4)
+    runFarm()
 end)
 
 -- =============================================
@@ -600,14 +655,12 @@ end)
 -- =============================================
 task.spawn(function()
     task.wait(3)
-    exitStatus.Text = "Running..."
-    setYellow(exitDot)
-    exitStation()
-    exitStatus.Text = "Complete"
-    setGreen(exitDot)
+    if farmStarted then return end
     startNPCKiller()
     task.wait(2)
-    farmAirdrops()
+    if not farmStarted then
+        runFarm()
+    end
 end)
 
 print("AUTO FARM LOADED!")
