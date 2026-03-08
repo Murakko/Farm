@@ -2,14 +2,6 @@
 -- AUTO FARM - FINAL VERSION
 -- =============================================
 
--- Prevent duplicate runs
-local env = getgenv()
-if env.AutoFarmRunning then
-    print("AutoFarm already running - skipping duplicate")
-    return
-end
-env.AutoFarmRunning = true
-
 local Players = game:GetService("Players")
 local player = Players.LocalPlayer or Players:GetPropertyChangedSignal("LocalPlayer"):Wait()
 if not player then
@@ -482,7 +474,6 @@ local function serverHop()
     print("Server hopping...")
     hopStatus.Text = "Hopping..."
     setYellow(hopDot)
-    getgenv().AutoFarmRunning = nil
 
     local success, err = pcall(function()
         teleportService:Teleport(game.PlaceId, player)
@@ -493,7 +484,6 @@ local function serverHop()
         hopStatus.Text = "Hop failed"
         setRed(hopDot)
         isHopping = false
-        getgenv().AutoFarmRunning = true
     end
 end
 
