@@ -10,7 +10,12 @@ if env.AutoFarmRunning then
 end
 env.AutoFarmRunning = true
 
-local player = game:GetService("Players").LocalPlayer
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer or Players:GetPropertyChangedSignal("LocalPlayer"):Wait()
+if not player then
+    Players:GetPropertyChangedSignal("LocalPlayer"):Wait()
+    player = Players.LocalPlayer
+end
 local vim = game:GetService("VirtualInputManager")
 local teleportService = game:GetService("TeleportService")
 
