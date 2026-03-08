@@ -498,13 +498,22 @@ local function pollAirdropTracker()
     task.spawn(function()
         while true do
             local ok, raw = pcall(function()
-                return game:HttpGet("https://inventories.jailbreakchangelogs.xyz/airdrops", true)
+                local response = request({
+                    Url = "https://inventories.jailbreakchangelogs.xyz/recent_airdrops",
+                    Method = "GET",
+                    Headers = {
+                        ["Origin"] = "https://jailbreakchangelogs.xyz",
+                        ["Referer"] = "https://jailbreakchangelogs.xyz/robberies?airdrops",
+                        ["User-Agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+                    }
+                })
+                return response.Body
             end)
             if not ok then
-                print("Tracker HTTP error: " .. tostring(raw))
+                print("Tracker error: " .. tostring(raw))
             else
-                print("Tracker response: " .. tostring(raw):sub(1, 200))
-                if raw and #raw > 5 then
+                print("Tracker response: " .. tostring(raw):sub(1, 300))
+                if raw and #raw > 5 and not raw:find("Not Found") and not raw:find("<!DOCTYPE") then
                     local parseOk, data = pcall(function()
                         return game:GetService("HttpService"):JSONDecode(raw)
                     end)
