@@ -490,6 +490,49 @@ local function collectAirdrop(airdrop, session)
 end
 
 -- =============================================
+-- AIRDROP SERVER TRACKER (jailbreakchangelogs.xyz)
+-- =============================================
+local trackedServerIds = {}
+local wsConnected = false
+
+local function connectAirdropTracker()
+    task.spawn(function()
+        pcall(function()
+            local ws = WebSocket.connect("wss://jailbreakchangelogs.xyz/tracker?type=airdrops")
+            wsConnected = true
+            print("Airdrop tracker connected!")
+
+            ws.OnMessage:Connect(function(msg)
+                pcall(function()
+                    local data = game:GetService("HttpService"):JSONDecode(msg)
+                    if data and data.type == "recent_airdrops" and data.data then
+                        trackedServerIds = {}
+                        for _, airdrop in ipairs(data.data) do
+                            if airdrop.job_id and airdrop.job_id ~= game.JobId then
+                                table.insert(trackedServerIds, airdrop.job_id)
+                            end
+                        end
+                        if #trackedServerIds > 0 then
+                            print("Tracker found " .. #trackedServerIds .. " servers with airdrops!")
+                        end
+                    end
+                end)
+            end)
+
+            ws.OnClose:Connect(function()
+                wsConnected = false
+                trackedServerIds = {}
+                print("Airdrop tracker disconnected, reconnecting...")
+                task.wait(5)
+                connectAirdropTracker()
+            end)
+        end)
+    end)
+end
+
+connectAirdropTracker()
+
+-- =============================================
 -- SERVER HOP
 -- =============================================
 local function serverHop()
@@ -500,35 +543,22 @@ local function serverHop()
     setYellow(hopDot)
 
     local success, err = pcall(function()
-        local url = "https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100"
-        local raw = game:HttpGet(url)
-        local data = game:GetService("HttpService"):JSONDecode(raw)
-
-        local targetId = nil
-        if data and data.data then
-            local servers = {}
-            for _, server in ipairs(data.data) do
-                if server.id and server.id ~= game.JobId and server.playing and server.maxPlayers then
-                    if server.playing < server.maxPlayers then
-                        table.insert(servers, server)
-                    end
-                end
-            end
-            -- Sort by player count
-            table.sort(servers, function(a, b) return a.playing < b.playing end)
-            -- Pick a server from the middle
-            if #servers > 0 then
-                local midIndex = math.floor(#servers / 2)
-                midIndex = math.max(1, midIndex)
-                targetId = servers[midIndex].id
-            end
+        -- Try tracked servers with active airdrops first
+        if #trackedServerIds > 0 then
+            local targetId = trackedServerIds[1]
+            print("Hopping to tracked airdrop server: " .. targetId)
+            teleportService:TeleportToPlaceInstance(game.PlaceId, targetId, player)
+            return
         end
 
-        if targetId then
-            print("Hopping to server: " .. targetId)
+        -- Fallback if tracker has nothing
+        print("No tracked servers yet, waiting for tracker...")
+        hopStatus.Text = "Waiting for tracker..."
+        task.wait(5)
+        if #trackedServerIds > 0 then
+            local targetId = trackedServerIds[1]
             teleportService:TeleportToPlaceInstance(game.PlaceId, targetId, player)
         else
-            print("No other server found, using fallback...")
             teleportService:Teleport(game.PlaceId, player)
         end
     end)
