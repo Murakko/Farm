@@ -505,26 +505,32 @@ local function connectAirdropTracker()
             ws.OnMessage:Connect(function(msg)
                 pcall(function()
                     local data = game:GetService("HttpService"):JSONDecode(msg)
+                    print("Tracker msg: " .. (data and data.action or "unknown"))
                     if data and data.action == "recent_airdrops" and data.data then
+                        print("Raw airdrop count: " .. #data.data)
                         trackedServerIds = {}
                         local now = os.time()
+                        print("Current time: " .. now)
                         for _, airdrop in ipairs(data.data) do
                             if airdrop.server and airdrop.server.job_id then
                                 local jobId = airdrop.server.job_id
-                                -- Skip current server
-                                if jobId == game.JobId then continue end
+                                local age = airdrop.server.timestamp and (now - airdrop.server.timestamp) or 9999
+                                print("Server: " .. jobId .. " | age: " .. age .. "s | gone_at: " .. tostring(airdrop.gone_at) .. " | now: " .. now)
+                                if jobId == game.JobId then
+                                    print("^ skipping (current server)")
+                                    continue
+                                end
                                 local notExpired = airdrop.gone_at and airdrop.gone_at > now
-                                local notTooOld = airdrop.server.timestamp and (now - airdrop.server.timestamp) < 60
+                                local notTooOld = age < 60
                                 if notExpired and notTooOld then
                                     table.insert(trackedServerIds, jobId)
+                                    print("^ ADDED!")
+                                else
+                                    print("^ skipped (expired=" .. tostring(not notExpired) .. " tooOld=" .. tostring(not notTooOld) .. ")")
                                 end
                             end
                         end
-                        if #trackedServerIds > 0 then
-                            print("Tracker found " .. #trackedServerIds .. " active servers!")
-                        else
-                            print("Tracker has no fresh airdrops right now, waiting...")
-                        end
+                        print("Final tracked count: " .. #trackedServerIds)
                     end
                 end)
             end)
