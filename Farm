@@ -519,7 +519,7 @@ local function serverHop()
         local serverData = HttpService:JSONDecode(response.Body)
         local currentJobId = game.JobId
         for _, server in ipairs(serverData.data or {}) do
-            if server.id ~= currentJobId and server.playing and server.playing > 0 then
+            if server.id and server.id ~= currentJobId then
                 print("Hopping to server: " .. server.id)
                 teleportService:TeleportToPlaceInstance(game.PlaceId, server.id, player)
                 return
